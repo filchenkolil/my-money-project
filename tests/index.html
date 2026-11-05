@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MyMoney: тесты</title>
+<style>body { font: 14px/1.5 system-ui, sans-serif; padding: 16px; } pre { white-space: pre-wrap; }</style>
+</head>
+<body>
+<h1>MyMoney: тесты</h1>
+<pre id="result">Идёт проверка…</pre>
+<script type="module">
+  const out = document.getElementById('result');
+  try {
+    const { runAll } = await import('./harness.js');
+    for (const f of ['money-dates', 'stats', 'store', 'backup']) await import(`./${f}.test.js`);
+    await runAll(out);
+    if (location.hostname === 'localhost') await fetch('/__report', { method: 'POST', body: out.textContent });
+  } catch (e) {
+    out.textContent = 'ОШИБКА ЗАГРУЗКИ ТЕСТОВ: ' + e.message + '\n' + (e.stack || '');
+    out.dataset.done = '1';
+    if (location.hostname === 'localhost') fetch('/__report', { method: 'POST', body: out.textContent });
+  }
+</script>
+</body>
+</html>
