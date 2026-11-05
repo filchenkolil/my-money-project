@@ -1,0 +1,20 @@
+# Личные данные пользователя никогда не попадают в репозиторий
+*.backup.json
+mymoney-backup-*.json
+mymoney-*.csv
+starter-data*
+data/
+private/
+exports/
+
+# Рабочие документы и макеты лежат вне репозитория; на случай копирования сюда
+PROJECT.md
+DEVPLAN.md
+mockups*.html
+
+# Служебное
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
