@@ -11,6 +11,11 @@ while ($l.IsListening) {
     if (($c.Request.HttpMethod) -eq 'POST' -and $c.Request.Url.AbsolutePath -eq '/__report') {
       $sr = New-Object IO.StreamReader($c.Request.InputStream, [Text.Encoding]::UTF8); [IO.File]::WriteAllText((Join-Path $Root '.test-result.txt'), $sr.ReadToEnd(), (New-Object Text.UTF8Encoding $false)); $c.Response.StatusCode = 204; $c.Response.Close(); continue
     }
+    if (($c.Request.HttpMethod) -eq 'POST' -and $c.Request.Url.AbsolutePath -eq '/__save') {
+      $name = [Text.RegularExpressions.Regex]::Replace(($c.Request.QueryString['name']), '[^a-zA-Z0-9_-]', '')
+      $dir = Join-Path $Root '.shots'; if (-not (Test-Path $dir)) { New-Item -ItemType Directory $dir | Out-Null }
+      $sr = New-Object IO.StreamReader($c.Request.InputStream, [Text.Encoding]::UTF8); [IO.File]::WriteAllText((Join-Path $dir "$name.html"), $sr.ReadToEnd(), (New-Object Text.UTF8Encoding $false)); $c.Response.StatusCode = 204; $c.Response.Close(); continue
+    }
     $rel = [Uri]::UnescapeDataString($c.Request.Url.AbsolutePath.TrimStart('/'))
     if ($rel -eq '' -or $rel.EndsWith('/')) { $rel += 'index.html' }
     $path = [IO.Path]::GetFullPath((Join-Path $Root $rel))

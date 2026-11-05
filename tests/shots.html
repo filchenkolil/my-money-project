@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>MyMoney: слепки экранов</title>
+<!-- Не тест. Открывает приложение во фрейме, проходит сценарии и сохраняет слепок каждого экрана в .shots/*.html (через tools/serve.ps1).
+     Слепок потом снимается Chrome обычным снимком экрана: tools/shots.sh. Реальных данных не используется. -->
+</head>
+<body>
+<pre id="log">Идёт…</pre>
+<script type="module">
+  import { openDb, deleteDb } from '../js/db.js';
+  import { MIGRATIONS } from '../js/migrations.js';
+  import { createStore } from '../js/store.js';
+
+  const DB = 'mymoney-beta', sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const log = document.getElementById('log'); const out = [];
+  async function waitFor(fn, ms = 4000) { const t0 = Date.now(); while (!fn()) { if (Date.now() - t0 > ms) throw new Error('timeout'); await sleep(30); } }
+  const today = new Date().toLocaleDateString('sv');
+  const dayAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toLocaleDateString('sv'); };
+
+  async function seed() {
+    const db = await openDb(DB, MIGRATIONS), s = createStore(db);
+    await s.seedDefaultsIfEmpty();
+    // выдуманные записи только чтобы порядок плиток был «частые сверху»
+    const plan = [['prod', 9], ['trans', 6], ['pet', 5], ['rest', 3], ['gifts', 2]];
+    for (const [cat, n] of plan) for (let i = 0; i < n; i++) await s.addExpense({ amount: 10000 + i * 700, date: dayAgo(i % 20), categoryId: cat });
+    await s.addExpense({ amount: 53000, date: today, categoryId: 'prod' });
+    await s.addExpense({ amount: 21000, date: today, categoryId: 'trans' });
+    db.close();
+  }
+
+  async function open(route = '') {
+    await deleteDb(DB); await seed();
+    const f = document.createElement('iframe');
+    f.style.cssText = 'width:390px;height:844px;border:0;position:fixed;left:-2000px';
+    f.src = '/beta/index.html' + route; document.body.append(f);
+    await new Promise((r) => f.addEventListener('load', r, { once: true }));
+    await waitFor(() => f.contentDocument.querySelector('.tabs button'));
+    const d = f.contentDocument, w = f.contentWindow;
+    return { f, d, w, q: (s) => d.querySelector(s), qa: (s) => [...d.querySelectorAll(s)],
+      click: (el) => el.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true })),
+      type: (v) => { const a = d.querySelector('#amt'); a.value = v; a.dispatchEvent(new w.Event('input', { bubbles: true })); } };
+  }
+
+  async function snap(a, name, { scroll = 0 } = {}) {
+    const d = a.d;
+    // значения полей и состояние фокуса попадают в разметку
+    d.querySelectorAll('input').forEach((i) => i.setAttribute('value', i.value));
+    d.querySelectorAll('script').forEach((s) => s.remove());
+    const body = d.querySelector('#body'); const top = scroll || body.scrollTop;
+    const html = '<!doctype html>' + d.documentElement.outerHTML.replace('<head>', '<head><base href="http://localhost:8765/beta/">')
+      .replace('</body>', `<script>document.getElementById('body').scrollTop=${top};<\/script></body>`);
+    await fetch('/__save?name=' + name, { method: 'POST', body: html });
+    out.push(name);
+  }
+
+  try {
+    let a = await open();
+    await snap(a, 'add-empty');
+    a.type('1500'); a.click([...a.qa('.tile')].find((t) => t.textContent.trim() === 'Питомец')); await sleep(900);
+    a.click(a.qa('[data-act="sub"]').find((b) => b.textContent === 'Корм')); await sleep(900);
+    await snap(a, 'add-filled');
+    a.q('#save').click(); await waitFor(() => a.q('.toast.show')); await sleep(400);
+    await snap(a, 'add-saved');
+    a.type('15оо'); a.click([...a.qa('.tile')].find((t) => t.textContent.trim() === 'Питомец')); a.q('#save').click(); await sleep(300);
+    await snap(a, 'add-error');
+    a.f.remove();
+    a = await open('#/history'); await snap(a, 'history'); a.f.remove();
+    a = await open('#/settings'); await snap(a, 'settings'); a.f.remove();
+    await deleteDb(DB);
+    log.textContent = 'готово: ' + out.join(', ');
+  } catch (e) { log.textContent = 'ОШИБКА ' + e.message + ' после ' + out.join(', '); }
+  log.dataset.done = '1';
+</script>
+</body>
+</html>
