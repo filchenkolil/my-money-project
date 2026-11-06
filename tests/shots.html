@@ -48,9 +48,9 @@
     // значения полей и состояние фокуса попадают в разметку
     d.querySelectorAll('input').forEach((i) => i.setAttribute('value', i.value));
     d.querySelectorAll('script').forEach((s) => s.remove());
-    const body = d.querySelector('#body'); const top = scroll || body.scrollTop;
+    const body = d.querySelector('#body'); const top = scroll || body.scrollTop; const wk = d.querySelector('#wk'); const wkLeft = wk ? wk.scrollLeft : 0;
     const html = '<!doctype html>' + d.documentElement.outerHTML.replace('<head>', '<head><base href="http://localhost:8765/beta/">')
-      .replace('</body>', `<script>document.getElementById('body').scrollTop=${top};<\/script></body>`);
+      .replace('</body>', `<script>document.getElementById('body').scrollTop=${top};var w=document.getElementById('wk');if(w)w.scrollLeft=${wkLeft};<\/script></body>`);
     await fetch('/__save?name=' + name, { method: 'POST', body: html });
     out.push(name);
   }
@@ -66,12 +66,21 @@
     a.type('15оо'); a.click([...a.qa('.tile')].find((t) => t.textContent.trim() === 'Питомец')); a.q('#save').click(); await sleep(300);
     await snap(a, 'add-error');
     a.f.remove();
-    a = await open('#/history'); await snap(a, 'history'); a.f.remove();
+    a = await open('#/history'); await waitFor(() => a.q('.rec')); await snap(a, 'history');
+    a.click(a.q('[data-act="opensheet"]')); await sleep(200);
+    { const el = a.q('#fcat'); el.value = 'pet'; el.dispatchEvent(new a.w.Event('change', { bubbles: true })); await sleep(150); }
+    await snap(a, 'history-filters'); a.f.remove();
+    a = await open('#/history'); await waitFor(() => a.q('.rec'));
+    a.click(a.q('.rec')); await waitFor(() => a.q('#amt') && a.q('h1')?.textContent === 'Редактирование'); await sleep(200);
+    await snap(a, 'edit');
+    a.type('2 345,50'); a.click(a.q('[data-act="reg"]')); a.click(a.q('#save')); await waitFor(() => a.q('.sheet')); await sleep(200);
+    await snap(a, 'edit-review'); a.f.remove();
+    a = await open(); { const s = a.q('#wk'); s.scrollLeft = s.scrollWidth * 0.8; await sleep(500); } await snap(a, 'add-strip'); a.f.remove();
     a = await open('#/settings'); await snap(a, 'settings'); a.f.remove();
     await deleteDb(DB);
     log.textContent = 'готово: ' + out.join(', ');
   } catch (e) { log.textContent = 'ОШИБКА ' + e.message + ' после ' + out.join(', '); }
-  log.dataset.done = '1';
+  log.dataset.done = '1'; fetch('/__report', { method: 'POST', body: log.textContent });
 </script>
 </body>
 </html>

@@ -1,26 +1,23 @@
-/* Главный экран: новый расход. Порядок: сумма, дата, категория, подкатегория, «Сохранить». */
-import { formatInput } from '../money.js';
-import { weekOf, dayShort } from '../dates.js';
+/* Форма расхода: «Новый расход» (главный экран) и «Редактирование» (та же форма, с проверкой изменений).
+   Порядок сверху вниз: сумма, дата, категория, подкатегория, комментарий и «Регулярный», «Сохранить». */
+import { formatInput, formatRub } from '../money.js';
+import { dayShort, monthKey, shiftMonthsISO } from '../dates.js';
 import { dayTotal, frequentCategories } from '../stats.js';
-import { formatRub } from '../money.js';
-import { newForm, afterSave, checkForm, tileList, expenseWord } from '../form.js';
+import { newForm, afterSave, checkForm, tileList, expenseWord, expenseToForm, diffExpense } from '../form.js';
 import { StoreError } from '../store.js';
 import { icon, UI } from '../ui/icons.js';
-import { esc, dotHTML, header, scrollToEl, reducedMotion } from '../ui/dom.js';
+import { esc, dotHTML, header, scrollToEl, reducedMotion, installNotice, sheetHTML } from '../ui/dom.js';
+import { stripHTML, mountStrip } from '../ui/datestrip.js';
 
-const DAY_NAMES = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
-
-export function mountAdd(root, ctx) {
-  let f = newForm(ctx.state.today), addSub = false, newSub = '';
+/** expense: если задан, экран работает как правка этого расхода. */
+export function mountExpenseForm(root, ctx, { expense = null } = {}) {
+  const edit = !!expense;
+  let f = edit ? expenseToForm(expense) : newForm(ctx.state.today), addSub = false, newSub = '', review = null;
   const tops = () => ctx.categories.filter((c) => c.parentId === null);
   // Порядок плиток считаем один раз за открытие экрана: во время ввода пачкой плитки не должны прыгать.
   const order = frequentCategories(ctx.expenses, tops().map((c) => c.id), ctx.state.today);
   const cat = (id) => ctx.categories.find((c) => c.id === id);
-
-  function weekStrip() {
-    return `<div class="wk" role="group" aria-label="Дата расхода">${weekOf(f.date).map((iso, i) =>
-      `<button type="button" data-act="day" data-v="${iso}" aria-pressed="${iso === f.date}">${DAY_NAMES[i]}<b class="num">${+iso.slice(8)}</b></button>`).join('')}</div>`;
-  }
+  const name = (id) => cat(id)?.name ?? '';
 
   function dayLine() {
     const d = dayTotal(ctx.expenses, f.date);
@@ -33,34 +30,47 @@ export function mountAdd(root, ctx) {
     return `<button type="button" class="tile" data-act="cat" data-id="${id}" aria-pressed="${f.categoryId === id}">${dotHTML(c)}<span class="nm">${esc(c.name)}</span></button>`;
   }
 
+  function reviewHTML() {
+    if (!review) return '';
+    const del = review.kind === 'del';
+    const body = del
+      ? `<div class="card"><b>Запись будет удалена</b><div class="small muted" style="margin-top:8px">${esc(name(expense.categoryId))} · ${formatRub(expense.amount)}${expense.note ? ' · ' + esc(expense.note) : ''} · ${esc(dayShort(expense.date))}</div></div>`
+      : `<div class="diff">${review.changes.map((c) => `<div class="d"><span class="small muted">${esc(c.label)}</span><span><s>${esc(c.from)}</s> → <b>${esc(c.to)}</b></span></div>`).join('')}</div>`;
+    return sheetHTML(`<h3>${del ? 'Удалить запись?' : 'Проверьте изменения'}</h3>${body}<div class="sheetbtns"><button type="button" class="btn ${del ? 'danger' : 'primary'} big" data-act="confirm">${del ? 'Удалить' : 'Применить изменения'}</button><button type="button" class="btn big" data-act="unreview">Вернуться к редактированию</button></div>`);
+  }
+
   function html() {
     const { ids, hidden } = tileList(order, f.categoryId, f.expanded);
     const subs = f.categoryId ? ctx.categories.filter((c) => c.parentId === f.categoryId) : [];
     const note = f.note || f.showNote;
-    let h = header('Новый расход', `<label class="ib" aria-label="Выбрать другую дату">${UI.cal}<input class="dpick" type="date" id="date" value="${f.date}" tabindex="-1"></label>`);
+    const range = edit ? '' : ` min="${shiftMonthsISO(ctx.state.today, -2)}" max="${shiftMonthsISO(ctx.state.today, 2)}"`;
+    let h = header(edit ? 'Редактирование' : 'Новый расход', `<label class="ib" aria-label="Выбрать другую дату">${UI.cal}<input class="dpick" type="date" id="date" value="${f.date}"${range} tabindex="-1"></label>`, edit);
     h += '<div class="pad">';
+    if (!edit) h += installNotice(ctx.expenses.length > 0);
     h += `<input class="inp amt num" id="amt" inputmode="decimal" autocomplete="off" aria-label="Сумма" placeholder="Введите сумму" value="${esc(f.amount)}">`;
     h += f.error ? `<div class="err" role="alert" id="err">${esc(f.error)}</div>` : '<div class="hint" id="hint">Например, 1 500 или 1 500,50</div>';
-    h += weekStrip() + dayLine();
+    h += stripHTML(ctx.state.today, f.date) + (edit ? '' : dayLine());
     h += '<div class="lbl"><span>Категория</span><span class="opt">частые сверху</span></div><div class="tiles">' + ids.map(tile).join('');
     if (hidden || f.expanded) h += `<button type="button" class="tile more" data-act="more" aria-expanded="${f.expanded}"><span class="dot">${icon('dots')}</span><span class="nm">${f.expanded ? 'Свернуть' : 'Ещё ' + hidden}</span></button>`;
     h += '</div>';
     if (f.categoryId) {
       h += '<div id="subs"><div class="lbl">Подкатегория <span class="opt">необязательно</span></div><div class="chips">' +
         subs.map((s) => `<button type="button" class="chip" data-act="sub" data-id="${s.id}" aria-pressed="${f.subcategoryId === s.id}">${esc(s.name)}</button>`).join('') +
-        (addSub ? '' : '<button type="button" class="chip" data-act="addsub" style="border-style:dashed;color:var(--accent);background:transparent">+ Добавить подкатегорию</button>') + '</div>';
+        (addSub ? '' : '<button type="button" class="chip dashed" data-act="addsub">+ Добавить подкатегорию</button>') + '</div>';
       if (addSub) h += `<div class="row" style="margin-top:8px"><input class="inp" id="newsub" maxlength="30" placeholder="Название подкатегории" value="${esc(newSub)}" style="flex:1;min-width:0"><button type="button" class="btn primary" data-act="addsubok">Добавить</button><button type="button" class="btn" data-act="addsubno">Отмена</button></div>`;
       h += '</div>';
     }
     h += `<div class="chips" id="extras" style="margin-top:16px"><button type="button" class="chip" data-act="note" aria-pressed="${!!note}">${note ? 'Комментарий' : '+ Комментарий'}</button><button type="button" class="chip" data-act="reg" aria-pressed="${f.isRegular}">Регулярный</button></div>`;
     if (note) h += `<input class="inp" id="note" maxlength="200" style="margin-top:8px" aria-label="Комментарий" placeholder="на что потратила" value="${esc(f.note)}">`;
-    h += '</div><div class="savebar"><button type="button" class="btn primary big" data-act="save" id="save">Сохранить</button></div>';
-    return h;
+    if (edit) h += '<button type="button" class="btn danger big" style="margin-top:24px" data-act="del">Удалить запись</button>';
+    h += `</div><div class="savebar"><button type="button" class="btn primary big" data-act="save" id="save">${edit ? 'Сохранить изменения' : 'Сохранить'}</button></div>`;
+    return h + reviewHTML();
   }
 
   function render({ keepScroll = true } = {}) {
     const top = keepScroll ? root.scrollTop : 0;
     root.innerHTML = html();
+    mountStrip(root, f.date);
     root.scrollTop = top;
   }
 
@@ -78,8 +88,10 @@ export function mountAdd(root, ctx) {
       try { el.setSelectionRange(pos, pos); } catch { /* поле не поддерживает выделение */ }
     }
     f.amount = el.value;
-    if (f.error) { f.error = null; const e = root.querySelector('#err'); if (e) { e.outerHTML = '<div class="hint" id="hint">Например, 1 500 или 1 500,50</div>'; } }
+    if (f.error) { f.error = null; const e = root.querySelector('#err'); if (e) e.outerHTML = '<div class="hint" id="hint">Например, 1 500 или 1 500,50</div>'; }
   }
+
+  const fail = (e) => (e instanceof StoreError ? e.message : 'Не удалось сохранить. Данные не изменились, попробуйте ещё раз.');
 
   async function save() {
     const r = checkForm(f);
@@ -90,9 +102,15 @@ export function mountAdd(root, ctx) {
       if (r.field === 'amount') focusAmt(); else scrollToEl(root, '#err');
       return;
     }
+    if (edit) {
+      const changes = diffExpense(expense, r.expense, name);
+      if (!changes.length) { ctx.toast('Изменений нет'); return; }
+      review = { kind: 'edit', changes, patch: r.expense }; render(); return;
+    }
     try {
       const rec = await ctx.store.addExpense(r.expense);
       await ctx.reload();
+      ctx.state.setMonth(monthKey(rec.date)); // история и аналитика сразу покажут месяц, куда попал расход
       f = afterSave(f); addSub = false;
       render({ keepScroll: false });
       root.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
@@ -103,10 +121,19 @@ export function mountAdd(root, ctx) {
         render();
         ctx.toast('Расход отменён');
       });
-    } catch (e) {
-      f.error = e instanceof StoreError ? e.message : 'Не удалось сохранить. Данные не изменились, попробуйте ещё раз.';
-      render();
-    }
+    } catch (e) { f.error = fail(e); render(); }
+  }
+
+  async function confirm() {
+    try {
+      if (review.kind === 'del') await ctx.store.deleteExpense(expense.id);
+      else await ctx.store.updateExpense(expense.id, review.patch);
+      const deleted = review.kind === 'del';
+      await ctx.reload();
+      ctx.state.setMonth(monthKey(deleted ? expense.date : review.patch.date));
+      location.hash = '#/history';
+      ctx.toast(deleted ? 'Запись удалена' : 'Изменения сохранены');
+    } catch (e) { review = null; f.error = fail(e); render(); }
   }
 
   async function saveSub() {
@@ -123,7 +150,9 @@ export function mountAdd(root, ctx) {
     const b = ev.target.closest('[data-act]');
     if (!b) return;
     const v = b.dataset;
+    if (v.act === 'sheetbg' && ev.target !== b) return; // нажатие внутри карточки не закрывает её
     switch (v.act) {
+      case 'back': location.hash = '#/history'; break;
       case 'day': f.date = v.v; render(); break;
       case 'more': f.expanded = !f.expanded; render(); break;
       case 'cat':
@@ -137,6 +166,9 @@ export function mountAdd(root, ctx) {
       case 'note': f.showNote = !(f.showNote && !f.note); render(); root.querySelector('#note')?.focus(); break;
       case 'reg': f.isRegular = !f.isRegular; render(); break;
       case 'save': save(); break;
+      case 'del': review = { kind: 'del' }; render(); break;
+      case 'confirm': confirm(); break;
+      case 'unreview': case 'sheetbg': review = null; render(); break;
     }
   };
   root.oninput = (ev) => {
@@ -149,9 +181,9 @@ export function mountAdd(root, ctx) {
   root.onkeydown = (ev) => { if (ev.key === 'Enter' && ev.target.id === 'newsub') { ev.preventDefault(); saveSub(); } };
 
   render({ keepScroll: false });
-  focusAmt();
+  if (!edit) focusAmt();
   return {
     /** Приложение вернулось на экран: если сутки сменились, а форма нетронута, дата становится сегодняшней. */
-    resume(prevToday) { if (!f.amount && f.date === prevToday && ctx.state.today !== prevToday) { f.date = ctx.state.today; render(); } },
+    resume(prevToday) { if (!edit && !f.amount && f.date === prevToday && ctx.state.today !== prevToday) { f.date = ctx.state.today; render(); } },
   };
 }

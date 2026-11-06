@@ -4,10 +4,12 @@ import { MIGRATIONS } from './migrations.js';
 import { createStore } from './store.js';
 import { todayISO } from './dates.js';
 import { createState } from './state.js';
-import { routeFromHash, hashFor } from './router.js';
+import { routeFromHash, routeParam, hashFor, tabFor } from './router.js';
+import { NO_FILTERS } from './history.js';
 import { UI } from './ui/icons.js';
 import { createToast, esc } from './ui/dom.js';
-import { mountAdd } from './screens/add.js';
+import { mountExpenseForm } from './screens/expense-form.js';
+import { mountHistory } from './screens/history.js';
 import { mountStub, mountSettings } from './screens/stub.js';
 
 const TABS = [['analytics', 'Аналитика', UI.chart], ['history', 'История', UI.hist], ['add', 'Добавить расход', UI.plus], null, ['settings', 'Настройки', UI.gear]];
@@ -44,25 +46,34 @@ async function boot() {
   const body = app.querySelector('#body'), tabs = app.querySelector('#tabs');
 
   const ctx = {
-    store, state: createState(todayISO()), categories: [], expenses: [],
+    store, state: Object.assign(createState(todayISO()), { filters: { ...NO_FILTERS } }), categories: [], expenses: [],
     toast: createToast(app.querySelector('#toast')),
     async reload() { [this.categories, this.expenses] = await Promise.all([store.categories(), store.allExpenses()]); },
   };
   await ctx.reload();
 
   let current = null, route = null;
-  function show() {
+  async function show() {
+    current?.dispose?.();
     route = routeFromHash(location.hash);
-    tabs.innerHTML = tabsHTML(route);
+    tabs.innerHTML = tabsHTML(tabFor(route));
     body.onclick = body.oninput = body.onchange = body.onkeydown = null;
     body.scrollTop = 0;
-    current = route === 'add' ? mountAdd(body, ctx) : route === 'settings' ? mountSettings(body, ctx) : mountStub(body, ctx, route);
+    if (route === 'edit') {
+      const exp = ctx.expenses.find((e) => e.id === routeParam(location.hash));
+      if (!exp) { location.hash = hashFor('history'); return; } // запись удалена или адрес устарел
+      current = mountExpenseForm(body, ctx, { expense: exp });
+    } else if (route === 'add') current = mountExpenseForm(body, ctx);
+    else if (route === 'history') current = mountHistory(body, ctx);
+    else if (route === 'settings') current = mountSettings(body, ctx);
+    else current = mountStub(body, ctx, route);
   }
   tabs.addEventListener('click', (ev) => {
     const b = ev.target.closest('[data-route]');
     if (!b) return;
-    if (b.dataset.route === route) { show(); return; } // повторное нажатие на «+» даёт чистую форму
-    location.hash = hashFor(b.dataset.route);
+    const target = hashFor(b.dataset.route);
+    if (location.hash === target) show(); // повторное нажатие на «+» даёт чистую форму
+    else location.hash = target;
   });
   window.addEventListener('hashchange', show);
   document.addEventListener('visibilitychange', () => {

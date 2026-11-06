@@ -1,5 +1,5 @@
 /* Мелкие помощники для разметки. */
-import { icon } from './icons.js';
+import { icon, UI } from './icons.js';
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESC[c]);
@@ -9,7 +9,7 @@ export const hueColor = (hue) => `hsl(${hue ?? 200} var(--cs) var(--cl))`;
 
 export const dotHTML = (cat) => `<span class="dot" style="background:${hueColor(cat.hue)}">${icon(cat.icon)}</span>`;
 
-export const header = (title, right = '') => `<div class="hdr"><h1>${esc(title)}</h1>${right}</div>`;
+export const header = (title, right = '', back = false) => `<div class="hdr">${back ? '<button type="button" class="ib" data-act="back" aria-label="Назад">' + UI.back + '</button>' : ''}<h1${back ? ' class="sub"' : ''}>${esc(title)}</h1>${right}</div>`;
 
 export const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -33,3 +33,13 @@ export function createToast(el) {
     timer = setTimeout(() => { el.classList.remove('show'); onUndo = null; }, undo ? 5000 : 2300);
   };
 }
+
+/** Приложение запущено с экрана «Домой» (а не во вкладке Safari). Данные вкладки и значка хранятся раздельно. */
+export const isStandalone = () => navigator.standalone === true || window.matchMedia?.('(display-mode: standalone)').matches === true;
+
+/** Напоминание установить приложение: пока записей нет и открыта вкладка Safari. */
+export const installNotice = (hasData) => (hasData || isStandalone() ? '' :
+  '<div class="notice" role="note"><b>Сначала установите приложение.</b><br>Нажмите «Поделиться» → «На экран „Домой“» и откройте MyMoney с иконки. Данные из Safari в установленное приложение не переносятся.</div>');
+
+/** Нижняя карточка поверх экрана. Содержимое задаёт вызывающий код. */
+export const sheetHTML = (inner) => `<div class="sheet" data-act="sheetbg"><div class="sheetbox" role="dialog" aria-modal="true">${inner}</div></div>`;

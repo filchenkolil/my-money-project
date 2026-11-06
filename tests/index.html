@@ -13,7 +13,7 @@
   const out = document.getElementById('result');
   try {
     const { runAll } = await import('./harness.js');
-    for (const f of ['money-dates', 'stats', 'store', 'backup', 'app', 'e2e']) await import(`./${f}.test.js`);
+    for (const f of ['money-dates', 'stats', 'store', 'backup', 'app', 'e2e', 'e2e4']) await import(`./${f}.test.js`);
     await runAll(out);
     if (location.hostname === 'localhost') await fetch('/__report', { method: 'POST', body: out.textContent });
   } catch (e) {

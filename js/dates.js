@@ -77,3 +77,30 @@ export function exportReminderDue(today, lastExportISO) {
   else return false;
   return !lastExportISO || lastExportISO < periodStart;
 }
+
+/** Та же дата через n месяцев; если в месяце нет такого числа, берётся последний день (31 марта − 1 месяц = 28 февраля). */
+export function shiftMonthsISO(iso, n) {
+  const key = addMonths(monthKey(iso), n);
+  return `${key}-${pad(Math.min(+iso.slice(8, 10), daysInMonth(key)))}`;
+}
+
+/** Понедельник недели, в которой лежит iso. */
+export const weekStart = (iso) => weekOf(iso)[0];
+
+/**
+ * Границы полосы дней в форме расхода: от сегодняшней даты на `months` месяцев назад и вперёд,
+ * расширенные до целых недель (чтобы полоса листалась неделями без обрезанных краёв).
+ * Если выбранная дата за пределами (правка старой записи), полоса дотягивается до неё.
+ */
+export function stripRange(today, selected = today, months = 2) {
+  const lo = [shiftMonthsISO(today, -months), selected].sort()[0];
+  const hi = [shiftMonthsISO(today, months), selected].sort().reverse()[0];
+  return { start: weekStart(lo), end: weekOf(hi)[6] };
+}
+
+/** Все даты от a до b включительно. */
+export function daysBetween(a, b) {
+  const out = [];
+  for (let d = a; d <= b; d = addDays(d, 1)) out.push(d);
+  return out;
+}

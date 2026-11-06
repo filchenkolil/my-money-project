@@ -1,5 +1,6 @@
 /* Логика формы нового расхода без привязки к странице: её можно проверять тестами. */
-import { parseAmount, AMOUNT_ERRORS } from './money.js';
+import { parseAmount, AMOUNT_ERRORS, toInputString, formatRub } from './money.js';
+import { dayShort } from './dates.js';
 
 export const FORM_ERRORS = { category: 'Выберите категорию.', ...AMOUNT_ERRORS };
 export const TILES_SHOWN = 7;
@@ -35,3 +36,23 @@ export function checkForm(f) {
 
 /** После сохранения остаётся только дата: ввод пачкой, несколько расходов за один день. */
 export const afterSave = (f) => newForm(f.date);
+
+/** Форма для правки существующего расхода. */
+export function expenseToForm(e) {
+  return { ...newForm(e.date), amount: toInputString(e.amount), categoryId: e.categoryId, subcategoryId: e.subcategoryId ?? null, note: e.note ?? '', showNote: !!e.note, isRegular: !!e.isRegular };
+}
+
+/**
+ * Что изменится при сохранении правки: список { label, from, to } для карточки «было → стало».
+ * Названия категорий и подкатегорий подставляет `names(id)`.
+ */
+export function diffExpense(old, next, names) {
+  const out = [], none = 'нет';
+  if (old.categoryId !== next.categoryId) out.push({ label: 'Категория', from: names(old.categoryId), to: names(next.categoryId) });
+  if ((old.subcategoryId ?? null) !== (next.subcategoryId ?? null)) out.push({ label: 'Подкатегория', from: old.subcategoryId ? names(old.subcategoryId) : none, to: next.subcategoryId ? names(next.subcategoryId) : none });
+  if (old.amount !== next.amount) out.push({ label: 'Сумма', from: formatRub(old.amount), to: formatRub(next.amount) });
+  if ((old.note ?? '') !== next.note) out.push({ label: 'Комментарий', from: old.note || none, to: next.note || none });
+  if (old.date !== next.date) out.push({ label: 'Дата', from: dayShort(old.date), to: dayShort(next.date) });
+  if (!!old.isRegular !== next.isRegular) out.push({ label: 'Регулярный', from: old.isRegular ? 'да' : none, to: next.isRegular ? 'да' : none });
+  return out;
+}
