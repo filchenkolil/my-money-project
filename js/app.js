@@ -11,6 +11,7 @@ import { createToast, esc } from './ui/dom.js';
 import { mountExpenseForm } from './screens/expense-form.js';
 import { mountHistory } from './screens/history.js';
 import { mountSettings } from './screens/settings.js';
+import { mountBackup, mountReset } from './screens/backup.js';
 import { mountAnalytics, mountCategoryDetail } from './screens/analytics.js';
 import { mountCategories, mountCategoryEdit, mountCategoryDelete } from './screens/categories.js';
 
@@ -64,6 +65,8 @@ async function boot() {
     cat: (id) => (ctx.categories.some((c) => c.id === id && c.parentId === null) ? mountCategoryDetail(body, ctx, id) : hashFor('analytics')),
     settings: () => mountSettings(body, ctx),
     categories: () => mountCategories(body, ctx),
+    backup: () => mountBackup(body, ctx),
+    reset: () => mountReset(body, ctx),
     catedit: (id) => (id === 'new' || ctx.categories.some((c) => c.id === id && c.parentId === null) ? mountCategoryEdit(body, ctx, id) : hashFor('categories')),
     catdel: (id) => (ctx.categories.some((c) => c.id === id) ? mountCategoryDelete(body, ctx, id) : hashFor('categories')),
   };

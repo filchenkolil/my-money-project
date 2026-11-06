@@ -21,3 +21,4 @@ Thumbs.db
 .test-result.txt
 .shots/
 .shot*.png
+tests/local-*

@@ -53,7 +53,7 @@ export function mountHistory(root, ctx) {
     const shown = active ? selectMonth(ctx.expenses, state.month, f).reduce((s, e) => s + e.amount, 0) : null;
     const filterBtn = `<button type="button" class="ib${active ? ' on' : ''}" data-act="opensheet" aria-label="Фильтры">${UI.filter}</button>`;
     return header('История', filterBtn) + monthStripHTML(monthStripKeys(ctx.expenses, state.today), state.month) + '<div class="pad">' +
-      (banner ? '<div class="banner"><span style="flex:1">Пора сделать экспорт за месяц</span><button type="button" class="ibtn" data-act="bannerx" aria-label="Скрыть напоминание">✕</button></div>' : '') +
+      (banner ? '<div class="banner"><span style="flex:1">Пора сделать экспорт за месяц</span><button type="button" class="btn" style="padding:8px 16px" data-act="export">Экспорт</button><button type="button" class="ibtn" data-act="bannerx" aria-label="Скрыть напоминание">✕</button></div>' : '') +
       `<div class="card"><div class="small muted">Всего за ${esc(monthName(state.month).toLowerCase())}</div><div class="total num">${formatRub(monthSum)}</div>${active ? `<div class="small muted" style="margin-top:4px">По фильтрам: <b class="num">${formatRub(shown)}</b></div>` : ''}</div>` +
       `<div id="hlist">${listHTML()}</div></div>` + (sheet ? filterSheet() : '');
   }
@@ -79,6 +79,7 @@ export function mountHistory(root, ctx) {
       case 'closesheet': case 'sheetbg': sheet = false; render(); break;
       case 'fltreg': state.filters = { ...state.filters, regularOnly: !state.filters.regularOnly }; render(); break;
       case 'fltreset': state.filters = { ...NO_FILTERS }; render(); break;
+      case 'export': location.hash = hashFor('backup'); break;
       case 'bannerx': banner = false; ctx.store.setMeta('exportBannerDismissed', windowKey); render(); break;
     }
   };

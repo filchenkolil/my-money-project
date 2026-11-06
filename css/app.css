@@ -225,3 +225,4 @@ select.inp[disabled] { background-color: var(--surface2); color: var(--muted); }
 .tbl td { padding: 8px 0 8px 4px; border-top: 1px solid var(--line); text-align: right; }
 .bar { height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
 .bar i { display: block; height: 100%; border-radius: 4px; }
+.filebtn { cursor: pointer; }
