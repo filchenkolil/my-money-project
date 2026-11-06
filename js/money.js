@@ -56,3 +56,14 @@ export function toInputString(kopecks) {
 export function convert(kopecks, rate) {
   return Math.round(kopecks * rate);
 }
+
+/** Короткая сумма для подписей над столбцами: 950, 75,3к, 1,2м (рубли, без копеек). */
+export function compactRub(kopecks) {
+  const rub = Math.round(kopecks / 100);
+  if (rub < 1000) return String(rub);
+  const fix = (n) => String(Math.round(n * 10) / 10).replace('.', ',');
+  return rub < 1000000 ? fix(rub / 1000) + 'к' : fix(rub / 1000000) + 'м';
+}
+
+/** Процент с запятой: 12,3% и 12%. */
+export const formatPct = (p) => String(p).replace('.', ',') + '%';

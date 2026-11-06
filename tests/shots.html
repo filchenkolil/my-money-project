@@ -76,6 +76,9 @@
     a.type('2 345,50'); a.click(a.q('[data-act="reg"]')); a.click(a.q('#save')); await waitFor(() => a.q('.sheet')); await sleep(200);
     await snap(a, 'edit-review'); a.f.remove();
     a = await open(); { const s = a.q('#wk'); s.scrollLeft = s.scrollWidth * 0.8; await sleep(500); } await snap(a, 'add-strip'); a.f.remove();
+    for (const [r, n] of [['#/analytics', 'an-overview'], ['#/analytics/compare', 'an-compare'], ['#/analytics/category', 'an-category'], ['#/categories', 'cats'], ['#/catedit/prod', 'cat-edit'], ['#/catdel/pet', 'cat-del']]) {
+      a = await open(r); await sleep(500); await snap(a, n); a.f.remove();
+    }
     a = await open('#/settings'); await snap(a, 'settings'); a.f.remove();
     await deleteDb(DB);
     log.textContent = 'готово: ' + out.join(', ');

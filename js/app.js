@@ -10,8 +10,8 @@ import { UI } from './ui/icons.js';
 import { createToast, esc } from './ui/dom.js';
 import { mountExpenseForm } from './screens/expense-form.js';
 import { mountHistory } from './screens/history.js';
-import { mountStub } from './screens/stub.js';
 import { mountSettings } from './screens/settings.js';
+import { mountAnalytics, mountCategoryDetail } from './screens/analytics.js';
 import { mountCategories, mountCategoryEdit, mountCategoryDelete } from './screens/categories.js';
 
 const TABS = [['analytics', 'Аналитика', UI.chart], ['history', 'История', UI.hist], ['add', 'Добавить расход', UI.plus], null, ['settings', 'Настройки', UI.gear]];
@@ -60,6 +60,8 @@ async function boot() {
     add: () => mountExpenseForm(body, ctx),
     edit: (id) => { const e = ctx.expenses.find((x) => x.id === id); return e ? mountExpenseForm(body, ctx, { expense: e }) : hashFor('history'); },
     history: () => mountHistory(body, ctx),
+    analytics: (dash) => mountAnalytics(body, ctx, dash),
+    cat: (id) => (ctx.categories.some((c) => c.id === id && c.parentId === null) ? mountCategoryDetail(body, ctx, id) : hashFor('analytics')),
     settings: () => mountSettings(body, ctx),
     categories: () => mountCategories(body, ctx),
     catedit: (id) => (id === 'new' || ctx.categories.some((c) => c.id === id && c.parentId === null) ? mountCategoryEdit(body, ctx, id) : hashFor('categories')),
@@ -71,7 +73,7 @@ async function boot() {
     tabs.innerHTML = tabsHTML(tabFor(route));
     body.onclick = body.oninput = body.onchange = body.onkeydown = null;
     body.scrollTop = 0;
-    const r = (SCREENS[route] ?? (() => mountStub(body, ctx, route)))(routeParam(location.hash));
+    const r = (SCREENS[route] ?? (() => hashFor('add')))(routeParam(location.hash));
     if (typeof r === 'string') { location.hash = r; return; }
     current = r;
   }
