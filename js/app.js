@@ -10,7 +10,9 @@ import { UI } from './ui/icons.js';
 import { createToast, esc } from './ui/dom.js';
 import { mountExpenseForm } from './screens/expense-form.js';
 import { mountHistory } from './screens/history.js';
-import { mountStub, mountSettings } from './screens/stub.js';
+import { mountStub } from './screens/stub.js';
+import { mountSettings } from './screens/settings.js';
+import { mountCategories, mountCategoryEdit, mountCategoryDelete } from './screens/categories.js';
 
 const TABS = [['analytics', 'Аналитика', UI.chart], ['history', 'История', UI.hist], ['add', 'Добавить расход', UI.plus], null, ['settings', 'Настройки', UI.gear]];
 
@@ -53,20 +55,25 @@ async function boot() {
   await ctx.reload();
 
   let current = null, route = null;
+  /** Раздел → как его открыть. Если записи по адресу нет (удалена, адрес устарел), возвращаем на список. */
+  const SCREENS = {
+    add: () => mountExpenseForm(body, ctx),
+    edit: (id) => { const e = ctx.expenses.find((x) => x.id === id); return e ? mountExpenseForm(body, ctx, { expense: e }) : hashFor('history'); },
+    history: () => mountHistory(body, ctx),
+    settings: () => mountSettings(body, ctx),
+    categories: () => mountCategories(body, ctx),
+    catedit: (id) => (id === 'new' || ctx.categories.some((c) => c.id === id && c.parentId === null) ? mountCategoryEdit(body, ctx, id) : hashFor('categories')),
+    catdel: (id) => (ctx.categories.some((c) => c.id === id) ? mountCategoryDelete(body, ctx, id) : hashFor('categories')),
+  };
   async function show() {
     current?.dispose?.();
     route = routeFromHash(location.hash);
     tabs.innerHTML = tabsHTML(tabFor(route));
     body.onclick = body.oninput = body.onchange = body.onkeydown = null;
     body.scrollTop = 0;
-    if (route === 'edit') {
-      const exp = ctx.expenses.find((e) => e.id === routeParam(location.hash));
-      if (!exp) { location.hash = hashFor('history'); return; } // запись удалена или адрес устарел
-      current = mountExpenseForm(body, ctx, { expense: exp });
-    } else if (route === 'add') current = mountExpenseForm(body, ctx);
-    else if (route === 'history') current = mountHistory(body, ctx);
-    else if (route === 'settings') current = mountSettings(body, ctx);
-    else current = mountStub(body, ctx, route);
+    const r = (SCREENS[route] ?? (() => mountStub(body, ctx, route)))(routeParam(location.hash));
+    if (typeof r === 'string') { location.hash = r; return; }
+    current = r;
   }
   tabs.addEventListener('click', (ev) => {
     const b = ev.target.closest('[data-route]');
