@@ -226,3 +226,5 @@ select.inp[disabled] { background-color: var(--surface2); color: var(--muted); }
 .bar { height: 8px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
 .bar i { display: block; height: 100%; border-radius: 4px; }
 .filebtn { cursor: pointer; }
+.updatebar { flex: none; display: flex; gap: 12px; align-items: center; background: var(--lime); color: #111; padding: 8px 16px; font-weight: 600; }
+.updatebar .btn { background: #111; color: #fff; min-height: 44px; }

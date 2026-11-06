@@ -7,6 +7,7 @@ import { createState } from './state.js';
 import { routeFromHash, routeParam, hashFor, tabFor } from './router.js';
 import { NO_FILTERS } from './history.js';
 import { UI } from './ui/icons.js';
+import { registerServiceWorker, showUpdateBanner } from './pwa.js';
 import { createToast, esc } from './ui/dom.js';
 import { mountExpenseForm } from './screens/expense-form.js';
 import { mountHistory } from './screens/history.js';
@@ -94,6 +95,7 @@ async function boot() {
     current?.resume?.(prev);
   });
   watchKeyboard(app);
+  registerServiceWorker({ onUpdate: (apply) => showUpdateBanner(app, apply) });
   show();
 }
 

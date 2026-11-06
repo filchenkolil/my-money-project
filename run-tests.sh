@@ -5,6 +5,7 @@ CHROME="${CHROME:-/c/Program Files/Google/Chrome/Application/chrome.exe}"
 URL="${URL:-http://localhost:8765/tests/index.html}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 RESULT="$DIR/.test-result.txt"
+bash "$DIR/tools/sw-sync.sh" >/dev/null
 rm -f "$RESULT"
 PROFILE="$(mktemp -d)"
 "$CHROME" --headless=new --disable-gpu --no-sandbox --user-data-dir="$(cygpath -w "$PROFILE" 2>/dev/null || echo "$PROFILE")" "$URL" >/dev/null 2>&1 &
