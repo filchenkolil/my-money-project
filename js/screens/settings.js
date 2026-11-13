@@ -12,7 +12,7 @@ export function mountSettings(root, ctx) {
   const theme = getTheme();
   root.innerHTML = header('Настройки') + '<div class="pad"><div class="lbl" style="margin-top:4px">Оформление</div><div class="seg" role="group" aria-label="Тема оформления">' + THEMES.map(([id, name]) => `<button type="button" data-theme="${id}" aria-pressed="${id === theme}">${name}</button>`).join('') + '</div><div style="height:8px"></div>' +
     ROWS.map(([route, label]) => `<button type="button" class="setrow" data-route="${route}"><span class="sp">${label}</span><span class="ch">${UI.chevron}</span></button>`).join('') +
-    `<dl class="kv" style="margin-top:24px"><dt>Версия</dt><dd>${esc(VERSION)}</dd><dt>Схема данных</dt><dd class="num">${SCHEMA_VERSION}</dd><dt>Канал</dt><dd>${esc(channelName(location.pathname))}</dd><dt>Категорий</dt><dd class="num">${ctx.categories.filter((c) => c.parentId === null).length}</dd><dt>Расходов</dt><dd class="num">${ctx.expenses.length}</dd></dl>` +
+    `<dl class="kv" style="margin-top:24px"><dt>Версия</dt><dd>${esc(VERSION)}</dd><dt>Схема данных</dt><dd class="num">${SCHEMA_VERSION}</dd><dt>Канал</dt><dd>${esc(channelName(location.pathname))}</dd><dt>Категорий</dt><dd class="num">${ctx.categories.filter((c) => c.parentId === null).length}</dd><dt>Расходов</dt><dd class="num">${ctx.expenses.length}</dd><dt>Поездок</dt><dd class="num">${ctx.trips.length}</dd></dl>` +
     '<p class="muted small" style="margin:16px 4px 0">Данные хранятся только на этом устройстве. Оформление «Как в системе» следует настройкам iPhone.</p></div>';
   root.onclick = (ev) => {
     const t = ev.target.closest('[data-theme]');

@@ -1,6 +1,6 @@
 /* Служебный скрипт: приложение открывается без интернета, новая версия ставится только после нажатия «Обновить».
    Список файлов и номер версии между маркерами обновляет tools/sw-sync.sh (запускать перед каждой публикацией). */
-/* VERSION-START */ const VERSION = '0.9.0'; /* VERSION-END */
+/* VERSION-START */ const VERSION = '2.0.0'; /* VERSION-END */
 const CACHE = 'mymoney-' + VERSION;
 const FILES = [
   /* FILES-START */
@@ -32,11 +32,14 @@ const FILES = [
   'js/screens/expense-form.js',
   'js/screens/history.js',
   'js/screens/settings.js',
+  'js/screens/trip-categories.js',
+  'js/screens/trips.js',
   'js/seed.js',
   'js/state.js',
   'js/stats.js',
   'js/store.js',
   'js/theme.js',
+  'js/trips.js',
   'js/ui/datestrip.js',
   'js/ui/dom.js',
   'js/ui/files.js',

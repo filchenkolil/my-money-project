@@ -16,8 +16,8 @@ test('настройки → категории: дерево с подкате�
     await waitFor(() => a.q('.setrow'), 'настройки');
     eq(a.qa('.setrow').length, 3);
     a.click(a.qa('.setrow')[0]); await waitFor(() => a.h1() === 'Категории', 'категории');
-    eq(a.qa('.tree .cat').length, 15);
-    const names = () => a.qa('.catname b').map((b) => b.textContent);
+    eq(a.qa('.tree .cat:not(.tcatrow)').length, 15);
+    const names = () => a.qa('.cat:not(.tcatrow) .catname b').map((b) => b.textContent);
     eq(names().slice(0, 2), ['Продукты', 'Транспорт']);
     ok(a.q('.catname').textContent.includes('Продукты'));
     a.click(a.qa('[data-act="move"][data-kind="top"][data-dir="1"]')[0]);
@@ -39,7 +39,7 @@ test('новая категория: цвет, значок, уникально�
     a.input(a.q('#cename'), 'Книги'); a.click(a.qa('.icb')[11]); a.click(a.qa('.pal button')[3]);
     a.click(a.q('[data-act="save"]'));
     await waitFor(() => a.h1() === 'Категории', 'список');
-    eq(a.qa('.tree .cat').length, 16);
+    eq(a.qa('.tree .cat:not(.tcatrow)').length, 16);
     const c = (await withStore((s) => s.categories())).find((x) => x.name === 'Книги');
     eq([c.icon, c.hue, c.parentId], ['book', 52, null]);
     a.click(a.q('[data-act="new"]')); await waitFor(() => a.h1() === 'Новая категория', 'новая');
@@ -96,7 +96,7 @@ test('удаление пустой категории: подтверждени
     a.click(a.q('[data-act="delete"]')); await waitFor(() => a.q('.sheet'), 'подтверждение');
     a.click(a.q('[data-act="confirm"]')); await waitFor(() => a.h1() === 'Категории', 'список');
     eq((await withStore((s) => s.categories())).some((c) => c.id === 'inv'), false);
-    eq(a.qa('.tree .cat').length, 14);
+    eq(a.qa('.tree .cat:not(.tcatrow)').length, 14);
   } finally { a.close(); }
 });
 

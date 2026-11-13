@@ -35,3 +35,9 @@ export function buildDefaultCategories() {
 
 /** Порядок категорий на главном экране, пока истории использования нет. */
 export const DEFAULT_FREQUENT_ORDER = ['prod', 'trans', 'pet', 'gifts', 'rest', 'home', 'cloth', 'health', 'fun', 'subs', 'mobile', 'edu', 'sport', 'other', 'inv'];
+
+/** Стартовый набор категорий поездок (тот же, что кладёт миграция 2; нужен после «Сброса данных»). */
+export const DEFAULT_TRIP_CATEGORIES = [['tc.exc', 'Экскурсии', 'camera', 188], ['tc.com', 'Связь', 'phone', 252], ['tc.trn', 'Транспорт', 'bus', 0], ['tc.sou', 'Сувениры', 'gift', 52], ['tc.res', 'Рестораны', 'fork', 325],
+  ['tc.fod', 'Продукты', 'cart', 228], ['tc.sty', 'Проживание', 'bed', 275], ['tc.tkt', 'Билеты', 'ticket', 18], ['tc.oth', 'Прочее', 'dots', 345]];
+
+export const buildDefaultTripCategories = () => DEFAULT_TRIP_CATEGORIES.map(([id, name, icon, hue], order) => ({ id, name, icon, hue, order }));

@@ -2,15 +2,17 @@
 import { formatRub, formatAmount, compactRub, formatPct } from '../money.js';
 import { monthName, monthShort, monthLabel, dayShort, addMonths } from '../dates.js';
 import { monthStripKeys } from '../history.js';
-import { overview, compare, categoryView, categoryDetail } from '../analytics.js';
+import { overview, compare, categoryView, categoryDetail, tripsDashboard } from '../analytics.js';
+import { rangeLabel } from '../dates.js';
 import { topsOf, subsOf } from '../categories.js';
+import { PALETTE } from '../seed.js';
 import { share } from '../stats.js';
 import { esc, hueColor, header } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { monthStripHTML, centerSelected } from '../ui/monthstrip.js';
 import { hashFor } from '../router.js';
 
-export const DASHBOARDS = [['overview', 'Обзор'], ['compare', 'Месяц к месяцу'], ['category', 'Категория']];
+export const DASHBOARDS = [['overview', 'Обзор'], ['compare', 'Месяц к месяцу'], ['category', 'Категория'], ['trips', 'Поездки']];
 const dashFromParam = (p) => (DASHBOARDS.some((d) => d[0] === p) ? p : 'overview');
 const lower = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 
@@ -54,7 +56,9 @@ function monthCols(keys, values, selected, subLabels = null) {
 export function mountAnalytics(root, ctx, param) {
   const { state } = ctx, dash = dashFromParam(param);
   const cat = (id) => ctx.categories.find((c) => c.id === id);
-  const keys = () => monthStripKeys(ctx.expenses, state.today);
+  const keys = () => monthStripKeys([...ctx.expenses, ...ctx.tripExpenses], state.today);
+  const td = () => ({ trips: ctx.trips, tripExpenses: ctx.tripExpenses });
+  const tripColor = (id) => hueColor(PALETTE[Math.max(0, ctx.trips.findIndex((t) => t.id === id)) % PALETTE.length]);
 
   function head() {
     return header('Аналитика') + `<div class="dstrip" role="tablist" aria-label="Дашборды">${DASHBOARDS.map(([id, name]) =>
@@ -62,26 +66,30 @@ export function mountAnalytics(root, ctx, param) {
   }
 
   function overviewHTML() {
-    const o = overview(ctx.expenses, state.month, state.today);
+    const o = overview(ctx.expenses, state.month, state.today, td());
     let h = head() + monthStripHTML(keys(), state.month) + `<div class="pad"><div class="hero"><div class="small muted">Расходы · ${esc(monthLabel(state.month))}</div><div class="big num">${formatAmount(o.total)}<span class="cur">₽</span></div>`;
     if (!o.progress.complete && !o.progress.future) h += `<div class="small muted" style="margin-top:4px">Месяц идёт: ${o.progress.day} из ${o.progress.days} дней</div>`;
     h += deltaLine({ ...o, complete: o.progress.complete, noPrevText: `За ${esc(lower(monthName(o.prevKey)))} данных нет, сравнивать не с чем` }) + '</div>';
     if (!o.items.length) return h + `<div class="empty"><p>В этом месяце расходов пока нет.</p></div></div>`;
-    const items = o.items.map((i) => ({ ...i, cat: cat(i.categoryId), color: hueColor(cat(i.categoryId).hue) }));
+    const items = o.items.map((i) => (i.type === 'trip' ? { ...i, label: `${i.name}, ${monthShort(state.month).toLowerCase()} ${state.month.slice(0, 4)}`, color: tripColor(i.tripId) } : { ...i, label: cat(i.categoryId).name, color: hueColor(cat(i.categoryId).hue) }));
     h += donut(items, o.total, `<div class="total num">${items.length}</div><div class="small muted">${categoriesWord(items.length)}</div>`);
-    h += '<div class="lbl">Все категории</div><div>' + items.map((i) =>
-      `<button type="button" class="legrow" data-act="cat" data-id="${i.categoryId}"><span class="dot sm" style="background:${i.color}"></span><span class="nm">${esc(i.cat.name)}</span><span class="pc num">${formatPct(i.share)}</span><span class="am num">${formatRub(i.amount)}${legendDelta(i)}</span></button>`).join('') + '</div></div>';
+    const row = (i) => i.type === 'trip'
+      ? `<button type="button" class="legrow" data-act="trip" data-id="${esc(i.tripId)}"><span class="dot sm" style="background:${i.color}"></span><span class="nm">${esc(i.label)}</span><span class="pc num">${formatPct(i.share)}</span><span class="am num">${formatRub(i.amount)}</span></button>`
+      : `<button type="button" class="legrow" data-act="cat" data-id="${i.categoryId}"><span class="dot sm" style="background:${i.color}"></span><span class="nm">${esc(i.label)}</span><span class="pc num">${formatPct(i.share)}</span><span class="am num">${formatRub(i.amount)}${legendDelta(i)}</span></button>`;
+    const tripItems = items.filter((i) => i.type === 'trip');
+    if (tripItems.length) h += '<div class="lbl">Поездки</div><div>' + tripItems.map(row).join('') + '</div>';
+    h += '<div class="lbl">Все категории</div><div>' + items.filter((i) => i.type !== 'trip').map(row).join('') + '</div></div>';
     return h;
   }
 
   function compareHTML() {
-    const ks = keys(), c = compare(ctx.expenses, ks, state.month);
+    const ks = keys(), c = compare(ctx.expenses, ks, state.month, td());
     let h = head() + '<div class="pad"><div class="hero"><div class="small muted">Расходы · ' + esc(monthLabel(state.month)) + `</div><div class="big num">${formatAmount(c.total)}<span class="cur">₽</span></div>`;
     h += deltaLine({ ...c, complete: state.month < state.today.slice(0, 7), noPrevText: ks[0] === state.month ? 'Первый месяц в данных' : `За ${esc(lower(monthName(c.prevKey)))} данных нет, сравнивать не с чем` }) + '</div>';
     h += monthCols(ks, c.months.map((m) => m.total), state.month);
     if (!c.hasPrev) return h + '<div class="empty"><p>Для сравнения нужны расходы за соседний месяц.</p></div></div>';
     h += `<div class="lbl">По категориям</div><table class="tbl num"><tr><th>Категория</th><th>${monthShort(c.prevKey)}</th><th>${monthShort(state.month)}</th><th>Разница</th></tr>` +
-      c.rows.map((r) => `<tr><td>${esc(cat(r.categoryId)?.name ?? '')}</td><td>${formatAmount(r.prev)}</td><td>${formatAmount(r.cur)}</td><td class="${r.diff > 0 ? 'up' : r.diff < 0 ? 'down' : ''}">${r.diff > 0 ? '+' : r.diff < 0 ? '−' : ''}${formatAmount(Math.abs(r.diff))}</td></tr>`).join('') + '</table></div>';
+      c.rows.map((r) => `<tr><td>${esc(r.categoryId === '__trips' ? 'Поездки' : cat(r.categoryId)?.name ?? '')}</td><td>${formatAmount(r.prev)}</td><td>${formatAmount(r.cur)}</td><td class="${r.diff > 0 ? 'up' : r.diff < 0 ? 'down' : ''}">${r.diff > 0 ? '+' : r.diff < 0 ? '−' : ''}${formatAmount(Math.abs(r.diff))}</td></tr>`).join('') + '</table></div>';
     return h;
   }
 
@@ -95,7 +103,7 @@ export function mountAnalytics(root, ctx, param) {
     const quick = ['prod', 'inv'].map((id) => cat(id)).filter(Boolean).concat(tops).filter((c, i, a) => a.indexOf(c) === i).slice(0, 2);
     const opts = tops.map((c) => `<option value="c:${c.id}"${state.dashCat === 'c:' + c.id ? ' selected' : ''}>${esc(c.name)}</option>` + subsOf(ctx.categories, c.id).map((s) => `<option value="s:${c.id}:${s.id}"${state.dashCat === `s:${c.id}:${s.id}` ? ' selected' : ''}>${esc(c.name)} › ${esc(s.name)}</option>`).join('')).join('');
     let h = head() + `<div class="pad"><div class="chips" style="margin-top:4px">${quick.map((c) => `<button type="button" class="chip" data-act="quick" data-v="c:${c.id}" aria-pressed="${state.dashCat === 'c:' + c.id}">${esc(c.name)}</button>`).join('')}</div><select class="inp" id="dcat" style="margin-top:8px" aria-label="Категория">${opts}</select>`;
-    const ks = keys(), v = categoryView(ctx.expenses, ks, state.month, sel);
+    const ks = keys(), v = categoryView(ctx.expenses, ks, state.month, sel, td());
     if (!v.stats.total) return h + `<div class="empty"><p>В категории «${esc(name)}» расходов пока нет.</p></div></div>`;
     h += `<div class="hero" style="margin-top:16px"><div class="small muted">${esc(name)} · ${esc(monthLabel(state.month))}</div><div class="big num">${formatAmount(v.cur)}<span class="cur">₽</span></div>`;
     if (v.hasPrev) h += deltaLine({ delta: v.delta, hasPrev: true, prevKey: addMonths(state.month, -1), prevTotal: v.prev, complete: state.month < state.today.slice(0, 7) });
@@ -106,9 +114,26 @@ export function mountAnalytics(root, ctx, param) {
     return h + '</div>';
   }
 
+  /** Дашборд «Поездки»: сравнение поездок между собой (стоимость, дни, стоимость в день, структура по категориям). */
+  function tripsHTML() {
+    const list = tripsDashboard(td());
+    let h = head() + '<div class="pad">';
+    if (!list.length) return h + '<div class="empty"><p>Поездок пока нет. Создайте первую на вкладке «Поездки».</p><button type="button" class="btn primary big" data-act="newtrip">Создать поездку</button></div></div>';
+    const tc = (id) => ctx.tripCategories.find((c) => c.id === id);
+    for (const s of list) {
+      h += `<button type="button" class="card tripcard" data-act="trip" data-id="${esc(s.trip.id)}"><div class="row"><b style="flex:1;text-align:left">${esc(s.trip.name)}</b><span class="small muted">${s.days} дн.</span></div><div class="small muted" style="text-align:left">${esc(rangeLabel(s.trip.start, s.trip.end))}</div><div class="total num" style="margin:4px 0;text-align:left">${formatRub(s.totalRub)}</div><div class="small muted num" style="text-align:left">${s.count ? formatRub(s.perDay) + ' в день' : 'расходов пока нет'}</div>`;
+      if (s.byCategory.length) {
+        h += `<div class="stack" style="margin:10px 0 8px">${s.byCategory.map((c) => `<i style="width:${share(c.amount, s.totalRub)}%;background:${hueColor(tc(c.categoryId)?.hue ?? 200)}"></i>`).join('')}</div>`;
+        h += `<div class="chips" style="gap:4px 10px">${s.byCategory.slice(0, 4).map((c) => `<span class="small"><span class="dot sm" style="background:${hueColor(tc(c.categoryId)?.hue ?? 200)};display:inline-block"></span> ${esc(tc(c.categoryId)?.name ?? '')} ${formatPct(Math.round(share(c.amount, s.totalRub)))}</span>`).join('')}</div>`;
+      }
+      h += '</button>';
+    }
+    return h + '</div>';
+  }
+
   function render() {
     const t = root.scrollTop, scroller = root.querySelector('.mscroll, .mstrip'), sl = scroller?.scrollLeft;
-    root.innerHTML = dash === 'compare' ? compareHTML() : dash === 'category' ? categoryHTML() : overviewHTML();
+    root.innerHTML = dash === 'compare' ? compareHTML() : dash === 'category' ? categoryHTML() : dash === 'trips' ? tripsHTML() : overviewHTML();
     root.scrollTop = t;
     centerSelected(root);
     if (sl != null) { const s = root.querySelector('.mscroll, .mstrip'); if (s) s.scrollLeft = sl; }
@@ -122,6 +147,8 @@ export function mountAnalytics(root, ctx, param) {
     if (v.act === 'dash') location.hash = hashFor('analytics', v.v === 'overview' ? '' : v.v);
     else if (v.act === 'month') state.setMonth(v.v);
     else if (v.act === 'cat') location.hash = hashFor('cat', v.id);
+    else if (v.act === 'trip') location.hash = hashFor('trip', v.id);
+    else if (v.act === 'newtrip') location.hash = hashFor('tripedit', 'new');
     else if (v.act === 'quick') { state.dashCat = v.v; render(); }
   };
   root.onchange = (ev) => { if (ev.target.id === 'dcat') { state.dashCat = ev.target.value; render(); } };
@@ -138,7 +165,7 @@ export function mountAnalytics(root, ctx, param) {
   };
 
   const off = state.subscribe((what) => { if (what === 'month') render(); });
-  if (!ctx.expenses.length) {
+  if (!ctx.expenses.length && !ctx.tripExpenses.length) {
     root.innerHTML = header('Аналитика') + '<div class="pad"><div class="empty"><h2>Расходов пока нет</h2><p>Диаграммы появятся, когда вы добавите первые расходы.</p><button type="button" class="btn primary big" data-act="addfirst">Добавить расход</button></div></div>';
     root.onclick = (ev) => { if (ev.target.closest('[data-act="addfirst"]')) location.hash = hashFor('add'); };
     return { dispose: off };

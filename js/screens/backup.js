@@ -1,7 +1,7 @@
 /* Экспорт, восстановление и сброс данных. */
 import { monthLabel, dayShort, exportReminderDue } from '../dates.js';
 import { monthStripKeys } from '../history.js';
-import { buildBackup, buildCsv, parseBackup, planRestore, csvFileName, jsonFileName, RESTORE_ERRORS } from '../backup.js';
+import { buildBackup, buildCsv, buildTripsCsv, parseBackup, planRestore, planTripRestore, csvFileName, jsonFileName, tripsCsvFileName, RESTORE_ERRORS } from '../backup.js';
 import { NO_FILTERS } from '../history.js';
 import { expenseWord } from '../form.js';
 import { StoreError } from '../store.js';
@@ -15,7 +15,8 @@ export function mountBackup(root, ctx) {
   let disposed = false; // экран закрыт: поздний ответ базы не должен рисовать поверх другого экрана
   const { state } = ctx;
   let period = '', plan = null, error = '', last = null, busy = false;
-  const months = () => monthStripKeys(ctx.expenses, state.today).reverse();
+  const months = () => monthStripKeys([...ctx.expenses, ...ctx.tripExpenses], state.today).reverse();
+  const hasData = () => ctx.expenses.length > 0 || ctx.trips.length > 0;
   ctx.store.getMeta('lastExportDate').then((v) => { last = v; render(); });
 
   function html() {
@@ -24,14 +25,16 @@ export function mountBackup(root, ctx) {
     h += `<p class="muted small" style="margin:4px 0 0">${last ? 'Последний экспорт: ' + esc(dayShort(last)) + ' ' + last.slice(0, 4) : 'Экспорт ещё не делался.'}</p>`;
     h += `<div class="lbl">Экспорт</div><select class="inp" id="period" aria-label="Период экспорта"><option value="">Весь период</option>${months().map((k) => `<option value="${k}"${period === k ? ' selected' : ''}>${esc(monthLabel(k))}</option>`).join('')}</select>`;
     h += '<div class="grid2" style="margin-top:12px"><button type="button" class="btn primary" data-act="csv">CSV для чтения</button><button type="button" class="btn primary" data-act="json">JSON для восстановления</button></div>';
+    if (ctx.trips.length) h += '<button type="button" class="btn big" style="margin-top:8px" data-act="tripscsv">CSV поездок для чтения</button>';
     h += '<p class="muted small" style="margin:8px 4px 0">CSV открывается в Excel. JSON нужен для восстановления: в нём категории, цвета, порядок и версия схемы.</p>';
     h += '<div class="lbl">Восстановление</div>';
-    if (ctx.expenses.length) h += '<div class="notice"><b>В приложении уже есть данные.</b><br>Записи из файла будут добавлены к ним и могут дублироваться.</div>';
+    if (hasData()) h += '<div class="notice"><b>В приложении уже есть данные.</b><br>Записи из файла будут добавлены к ним и могут дублироваться.</div>';
     if (error) h += `<div class="err" role="alert"><b>Файл не подошёл.</b><br>${esc(error)}</div>`;
     h += '<label class="btn big filebtn" style="display:block;text-align:center;margin-top:10px">Выбрать файл JSON<input type="file" id="file" accept=".json,application/json" hidden></label></div>';
     if (plan) {
       const n = plan.expenses.length, c = plan.createdCategories;
-      h += sheetHTML(`<h3>Восстановить из файла?</h3><div class="card">В файле ${expenseWord(n)}${c ? `, новых категорий: ${c}` : ''}. Они будут <b>добавлены</b> к тем, что уже есть в приложении.${ctx.expenses.length ? ' Повторное восстановление того же файла создаст дубли.' : ''}</div><div class="sheetbtns"><button type="button" class="btn primary big" data-act="restore">Добавить</button><button type="button" class="btn big" data-act="cancel">Отмена</button></div>`);
+      const tn = plan.tripExpenses.length, tt = plan.trips.length;
+      h += sheetHTML(`<h3>Восстановить из файла?</h3><div class="card">В файле ${expenseWord(n)}${tn ? ` и ${expenseWord(tn)} поездок` : ''}${c ? `, новых категорий: ${c}` : ''}${tt ? `, новых поездок: ${tt}` : ''}. Они будут <b>добавлены</b> к тем, что уже есть в приложении.${hasData() ? ' Повторное восстановление того же файла создаст дубли расходов.' : ''}</div><div class="sheetbtns"><button type="button" class="btn primary big" data-act="restore">Добавить</button><button type="button" class="btn big" data-act="cancel">Отмена</button></div>`);
     }
     return h;
   }
@@ -41,9 +44,9 @@ export function mountBackup(root, ctx) {
     if (busy) return; busy = true;
     try {
       // данные берём из памяти, чтобы вызвать меню «Поделиться» сразу по касанию (iOS требует жест пользователя)
-      const res = kind === 'csv'
-        ? await saveTextFile(csvFileName(period || null), buildCsv(ctx.expenses, ctx.categories, period || null), 'text/csv')
-        : await saveTextFile(jsonFileName(state.today), buildBackup({ categories: ctx.categories, expenses: ctx.expenses }), 'application/json');
+      const res = kind === 'csv' ? await saveTextFile(csvFileName(period || null), buildCsv(ctx.expenses, ctx.categories, period || null), 'text/csv')
+        : kind === 'tripscsv' ? await saveTextFile(tripsCsvFileName(period || null), buildTripsCsv(ctx.trips, ctx.tripCategories, ctx.tripExpenses, period || null), 'text/csv')
+        : await saveTextFile(jsonFileName(state.today), buildBackup({ categories: ctx.categories, expenses: ctx.expenses, trips: ctx.trips, tripCategories: ctx.tripCategories, tripExpenses: ctx.tripExpenses }), 'application/json');
       if (res === 'cancelled') return;
       await ctx.store.setMeta('lastExportDate', state.today); last = state.today; render();
       ctx.toast(res === 'shared' ? 'Файл готов: выберите «Сохранить в Файлы»' : 'Файл сохранён в «Загрузки»');
@@ -54,7 +57,7 @@ export function mountBackup(root, ctx) {
     error = ''; plan = null;
     try {
       const r = parseBackup(await readTextFile(file));
-      if (!r.ok) error = RESTORE_ERRORS[r.reason]; else plan = planRestore(ctx.categories, r.data);
+      if (!r.ok) error = RESTORE_ERRORS[r.reason]; else plan = { ...planRestore(ctx.categories, r.data), ...planTripRestore({ trips: ctx.trips, tripCategories: ctx.tripCategories }, r.data) };
     } catch { error = RESTORE_ERRORS.not_json; }
     render();
   }
@@ -63,8 +66,9 @@ export function mountBackup(root, ctx) {
     try {
       const r = await ctx.store.applyRestore(plan);
       plan = null; await ctx.reload();
-      state.setMonth(r.expenses ? [...ctx.expenses].sort((a, b) => (a.date < b.date ? 1 : -1))[0].date.slice(0, 7) : state.month);
-      render(); ctx.toast(`Добавлено: ${expenseWord(r.expenses)}`);
+      const dates = [...ctx.expenses, ...ctx.tripExpenses].map((e) => e.date).sort().reverse();
+      state.setMonth(dates.length ? dates[0].slice(0, 7) : state.month);
+      render(); ctx.toast(`Добавлено: ${expenseWord(r.expenses + r.tripExpenses)}`);
     } catch (e) { plan = null; error = fail(e); render(); } finally { busy = false; }
   }
 
@@ -74,6 +78,7 @@ export function mountBackup(root, ctx) {
     switch (b.dataset.act) {
       case 'back': location.hash = hashFor('settings'); break;
       case 'csv': doExport('csv'); break;
+      case 'tripscsv': doExport('tripscsv'); break;
       case 'json': doExport('json'); break;
       case 'restore': restore(); break;
       case 'cancel': case 'sheetbg': plan = null; render(); break;

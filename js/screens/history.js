@@ -5,6 +5,7 @@ import { selectMonth, groupByDay, monthStripKeys, filtersActive, NO_FILTERS } fr
 import { UI } from '../ui/icons.js';
 import { esc, dotHTML, header, installNotice, sheetHTML } from '../ui/dom.js';
 import { hashFor } from '../router.js';
+import { tripMonthTotals } from '../trips.js';
 import { monthStripHTML, centerSelected } from '../ui/monthstrip.js';
 
 export function mountHistory(root, ctx) {
@@ -49,13 +50,13 @@ export function mountHistory(root, ctx) {
     if (!ctx.expenses.length) {
       return header('История') + `<div class="pad">${installNotice(false)}<div class="heroc"><svg width="96" height="96" viewBox="0 0 96 96" fill="none" aria-hidden="true"><circle cx="48" cy="48" r="38" fill="#fff" fill-opacity=".55" stroke="#111" stroke-width="2"/><circle cx="48" cy="48" r="22" fill="#E8499A"/><path d="M48 38v20M38 48h20" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg><h2>Расходов пока нет</h2><p>Первая запись займёт несколько секунд: сумма, категория, готово.</p><button type="button" class="btn primary big" data-act="add">Добавить первый расход</button></div></div>`;
     }
-    const f = state.filters, active = filtersActive(f);
+    const f = state.filters, active = filtersActive(f), tripMonth = tripMonthTotals(ctx.trips, ctx.tripExpenses)[state.month] ?? 0;
     const monthSum = selectMonth(ctx.expenses, state.month).reduce((s, e) => s + e.amount, 0);
     const shown = active ? selectMonth(ctx.expenses, state.month, f).reduce((s, e) => s + e.amount, 0) : null;
     const filterBtn = `<button type="button" class="ib${active ? ' on' : ''}" data-act="opensheet" aria-label="Фильтры">${UI.filter}</button>`;
     return header('История', filterBtn) + monthStripHTML(monthStripKeys(ctx.expenses, state.today), state.month) + '<div class="pad">' +
       (banner ? '<div class="banner"><span style="flex:1">Пора сделать экспорт за месяц</span><button type="button" class="btn" style="padding:8px 16px" data-act="export">Экспорт</button><button type="button" class="ibtn" data-act="bannerx" aria-label="Скрыть напоминание">✕</button></div>' : '') +
-      `<div class="card"><div class="small muted">Всего за ${esc(monthName(state.month).toLowerCase())}</div><div class="total num">${formatRub(monthSum)}</div>${active ? `<div class="small muted" style="margin-top:4px">По фильтрам: <b class="num">${formatRub(shown)}</b></div>` : ''}</div>` +
+      `<div class="card"><div class="small muted">Всего за ${esc(monthName(state.month).toLowerCase())}</div><div class="total num">${formatRub(monthSum)}</div>${active ? `<div class="small muted" style="margin-top:4px">По фильтрам: <b class="num">${formatRub(shown)}</b></div>` : ''}${tripMonth ? `<div class="small muted" style="margin-top:4px">Поездки в этом месяце: <b class="num">${formatRub(tripMonth)}</b> (на вкладке «Поездки»)</div>` : ''}</div>` +
       `<div id="hlist">${listHTML()}</div></div>` + (sheet ? filterSheet() : '');
   }
 

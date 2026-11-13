@@ -9,6 +9,20 @@ export const MIGRATIONS = [
     exp.createIndex('categoryId', 'categoryId');
     db.createObjectStore('meta', { keyPath: 'key' });
   },
+  // 2 (v2, «Поездки»): поездки, расходы поездок, отдельный набор категорий поездок. Данные версии 1 не меняются.
+  function v2(db, tx) {
+    db.createObjectStore('trips', { keyPath: 'id' });
+    const te = db.createObjectStore('tripExpenses', { keyPath: 'id' });
+    te.createIndex('tripId', 'tripId');
+    te.createIndex('date', 'date');
+    te.createIndex('categoryId', 'categoryId');
+    const tc = db.createObjectStore('tripCategories', { keyPath: 'id' });
+    // стартовый набор (копия на момент выпуска v2, чтобы миграция не зависела от будущих правок seed.js)
+    [['tc.exc', 'Экскурсии', 'camera', 188], ['tc.com', 'Связь', 'phone', 252], ['tc.trn', 'Транспорт', 'bus', 0], ['tc.sou', 'Сувениры', 'gift', 52], ['tc.res', 'Рестораны', 'fork', 325],
+      ['tc.fod', 'Продукты', 'cart', 228], ['tc.sty', 'Проживание', 'bed', 275], ['tc.tkt', 'Билеты', 'ticket', 18], ['tc.oth', 'Прочее', 'dots', 345]]
+      .forEach(([id, name, icon, hue], order) => tc.put({ id, name, icon, hue, order }));
+    void tx;
+  },
 ];
 
 /** Версия схемы данных: попадает в файл экспорта. */

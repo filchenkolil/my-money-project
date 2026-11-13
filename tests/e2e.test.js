@@ -44,7 +44,7 @@ test('экран: «Введите сумму», пример формата, 7 
     ok(a.q('#hint').textContent.includes('1 500'));
     eq(a.qa('.tile:not(.more)').length, 7);
     ok(a.q('.tile.more').textContent.includes('Ещё 8'));
-    eq(a.qa('.tabs button').length, 4); // 4 кнопки + пустое место: пятое место свободно
+    eq(a.qa('.tabs button').map((b) => b.textContent.trim() || 'плюс'), ['Аналитика', 'История', 'плюс', 'Поездки', 'Настройки']); // пять фиксированных мест
     eq(a.q('.fab').textContent.trim(), '', 'под «+» нет подписи');
     eq(a.q('.fab').getAttribute('aria-label'), 'Добавить расход');
     eq(a.qa('.wk button').length % 7, 0);

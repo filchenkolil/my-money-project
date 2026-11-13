@@ -14,10 +14,12 @@ import { mountExpenseForm } from './screens/expense-form.js';
 import { mountHistory } from './screens/history.js';
 import { mountSettings } from './screens/settings.js';
 import { mountBackup, mountReset } from './screens/backup.js';
+import { mountTrips, mountTrip, mountTripEdit, mountTripDelete } from './screens/trips.js';
+import { mountTripCategoryEdit, mountTripCategoryDelete } from './screens/trip-categories.js';
 import { mountAnalytics, mountCategoryDetail } from './screens/analytics.js';
 import { mountCategories, mountCategoryEdit, mountCategoryDelete } from './screens/categories.js';
 
-const TABS = [['analytics', 'Аналитика', UI.chart], ['history', 'История', UI.hist], ['add', 'Добавить расход', UI.plus], null, ['settings', 'Настройки', UI.gear]];
+const TABS = [['analytics', 'Аналитика', UI.chart], ['history', 'История', UI.hist], ['add', 'Добавить расход', UI.plus], ['trips', 'Поездки', UI.plane], ['settings', 'Настройки', UI.gear]];
 
 function tabsHTML(active) {
   return TABS.map((t) => {
@@ -70,7 +72,8 @@ async function boot() {
   const ctx = {
     store, state: Object.assign(createState(todayISO()), { filters: { ...NO_FILTERS } }), categories: [], expenses: [],
     toast: createToast(app.querySelector('#toast')),
-    async reload() { [this.categories, this.expenses] = await Promise.all([store.categories(), store.allExpenses()]); },
+    trips: [], tripExpenses: [], tripCategories: [],
+    async reload() { [this.categories, this.expenses, this.trips, this.tripExpenses, this.tripCategories] = await Promise.all([store.categories(), store.allExpenses(), store.trips(), store.tripExpenses(), store.tripCategories()]); },
   };
   await ctx.reload();
 
@@ -78,7 +81,11 @@ async function boot() {
   /** Раздел → как его открыть. Если записи по адресу нет (удалена, адрес устарел), возвращаем на список. */
   const SCREENS = {
     add: () => mountExpenseForm(body, ctx),
-    edit: (id) => { const e = ctx.expenses.find((x) => x.id === id); return e ? mountExpenseForm(body, ctx, { expense: e }) : hashFor('history'); },
+    edit: (id) => {
+      const e = ctx.expenses.find((x) => x.id === id), te = e ? null : ctx.tripExpenses.find((x) => x.id === id);
+      if (e) return mountExpenseForm(body, ctx, { expense: e });
+      return te ? mountExpenseForm(body, ctx, { expense: te, kind: 'trip' }) : hashFor('history');
+    },
     history: () => mountHistory(body, ctx),
     analytics: (dash) => mountAnalytics(body, ctx, dash),
     cat: (id) => (ctx.categories.some((c) => c.id === id && c.parentId === null) ? mountCategoryDetail(body, ctx, id) : hashFor('analytics')),
@@ -86,6 +93,12 @@ async function boot() {
     categories: () => mountCategories(body, ctx),
     backup: () => mountBackup(body, ctx),
     reset: () => mountReset(body, ctx),
+    trips: () => mountTrips(body, ctx),
+    trip: (id) => (ctx.trips.some((t) => t.id === id) ? mountTrip(body, ctx, id) : hashFor('trips')),
+    tripedit: (id) => (id === 'new' || ctx.trips.some((t) => t.id === id) ? mountTripEdit(body, ctx, id) : hashFor('trips')),
+    tripdel: (id) => (ctx.trips.some((t) => t.id === id) ? mountTripDelete(body, ctx, id) : hashFor('trips')),
+    tcatedit: (id) => (id === 'new' || ctx.tripCategories.some((c) => c.id === id) ? mountTripCategoryEdit(body, ctx, id) : hashFor('categories')),
+    tcatdel: (id) => (ctx.tripCategories.some((c) => c.id === id) ? mountTripCategoryDelete(body, ctx, id) : hashFor('categories')),
     catedit: (id) => (id === 'new' || ctx.categories.some((c) => c.id === id && c.parentId === null) ? mountCategoryEdit(body, ctx, id) : hashFor('categories')),
     catdel: (id) => (ctx.categories.some((c) => c.id === id) ? mountCategoryDelete(body, ctx, id) : hashFor('categories')),
   };

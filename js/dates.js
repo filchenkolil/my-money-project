@@ -104,3 +104,12 @@ export function daysBetween(a, b) {
   for (let d = a; d <= b; d = addDays(d, 1)) out.push(d);
   return out;
 }
+
+/** «6 – 10 декабря 2026», «28 дек 2026 – 3 янв 2027»: подпись периода поездки. */
+export function rangeLabel(start, end) {
+  const [y1, m1, d1] = [start.slice(0, 4), +start.slice(5, 7), +start.slice(8, 10)], [y2, m2, d2] = [end.slice(0, 4), +end.slice(5, 7), +end.slice(8, 10)];
+  if (start === end) return `${dayShort(start)} ${y1}`;
+  if (y1 === y2 && m1 === m2) return `${d1} – ${d2} ${MONTHS_GEN[m1 - 1]} ${y1}`;
+  const short = (iso) => `${+iso.slice(8, 10)} ${MONTHS_SHORT[+iso.slice(5, 7) - 1].toLowerCase()} ${iso.slice(0, 4)}`;
+  return `${short(start)} – ${short(end)}`;
+}

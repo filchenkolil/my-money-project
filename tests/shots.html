@@ -27,11 +27,18 @@
     for (const [cat, n] of plan) for (let i = 0; i < n; i++) await s.addExpense({ amount: 10000 + i * 700, date: dayAgo(i % 20), categoryId: cat });
     await s.addExpense({ amount: 53000, date: today, categoryId: 'prod' });
     await s.addExpense({ amount: 21000, date: today, categoryId: 'trans' });
+    const sd = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv'); };
+    const tr = await s.addTrip({ name: 'Турция', start: sd(1), end: sd(5), currency: 'TRY', rate: '2,35' });
+    await s.addTripExpense({ tripId: tr.id, categoryId: 'tc.tkt', amount: 2840000, isRub: true, date: sd(-6), note: 'Москва — Анталья' });
+    await s.addTripExpense({ tripId: tr.id, categoryId: 'tc.sty', amount: 950000, date: sd(1), note: 'отель, 4 ночи' });
+    await s.addTripExpense({ tripId: tr.id, categoryId: 'tc.res', amount: 125000, date: sd(1), note: 'ужин у моря' });
+    await s.addTrip({ name: 'Москва', start: sd(20), end: sd(22), currency: 'RUB', rate: '' });
     db.close();
   }
 
   async function open(route = '') {
     await deleteDb(DB); await seed();
+    if (route.includes('TRIP')) { const db = await openDb(DB, MIGRATIONS), s = createStore(db); route = route.replace('TRIP', (await s.trips()).find((t) => t.name === 'Турция').id); db.close(); }
     const f = document.createElement('iframe');
     f.style.cssText = 'width:390px;height:844px;border:0;position:fixed;left:-2000px';
     f.src = '/beta/index.html' + route; document.body.append(f);
@@ -76,7 +83,8 @@
     a.type('2 345,50'); a.click(a.q('[data-act="reg"]')); a.click(a.q('#save')); await waitFor(() => a.q('.sheet')); await sleep(200);
     await snap(a, 'edit-review'); a.f.remove();
     a = await open(); { const s = a.q('#wk'); s.scrollLeft = s.scrollWidth * 0.8; await sleep(500); } await snap(a, 'add-strip'); a.f.remove();
-    for (const [r, n] of [['#/analytics', 'an-overview'], ['#/analytics/compare', 'an-compare'], ['#/analytics/category', 'an-category'], ['#/categories', 'cats'], ['#/catedit/prod', 'cat-edit'], ['#/catdel/pet', 'cat-del']]) {
+    a = await open(); a.click(a.qa('.seg button')[1]); await sleep(300); a.type('1250'); await sleep(100); a.click(a.qa('.tile').find((t) => t.textContent.trim() === 'Рестораны')); await sleep(900); await snap(a, 'add-trip'); a.f.remove();
+    for (const [r, n] of [['#/trips', 'trips'], ['#/trip/TRIP', 'trip'], ['#/tripedit/TRIP', 'trip-edit'], ['#/tripedit/new', 'trip-new'], ['#/analytics/trips', 'an-trips'], ['#/analytics', 'an-overview'], ['#/analytics/compare', 'an-compare'], ['#/analytics/category', 'an-category'], ['#/categories', 'cats'], ['#/catedit/prod', 'cat-edit'], ['#/catdel/pet', 'cat-del']]) {
       a = await open(r); await sleep(500); await snap(a, n); a.f.remove();
     }
     a = await open('#/settings'); await snap(a, 'settings'); a.f.remove();

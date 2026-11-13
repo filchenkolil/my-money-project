@@ -27,7 +27,9 @@ export function mountCategories(root, ctx) {
       h += '<div class="subs">' + subs.map((s, j) => `<div class="sub"><button type="button" class="subname" data-act="subedit" data-id="${s.id}">${esc(s.name)}</button>${arrows('sub', s.id, j, subs.length, c.id)}</div>`).join('') +
         `<button type="button" class="subadd" data-act="subnew" data-id="${c.id}">+ подкатегория</button></div>`;
     });
-    h += '<button type="button" class="btn big" style="margin-top:16px" data-act="new">+ Добавить категорию</button></div>';
+    h += '<button type="button" class="btn big" style="margin-top:16px" data-act="new">+ Добавить категорию</button>';
+    h += '<div class="lbl" style="margin-top:32px">Категории поездок</div>' + ctx.tripCategories.map((c, i) => `<div class="cat tcatrow"><button type="button" class="catname" data-act="tedit" data-id="${c.id}">${dotHTML(c)}<span class="sp"><b>${esc(c.name)}</b></span></button>${arrows('tcat', c.id, i, ctx.tripCategories.length)}</div>`).join('');
+    h += '<button type="button" class="btn big" style="margin-top:16px" data-act="tnew">+ Добавить категорию поездки</button></div>';
     if (sheet) {
       const isNew = !sheet.id, sub = isNew ? null : ctx.categories.find((c) => c.id === sheet.id);
       h += sheetHTML(`<h3>${isNew ? 'Новая подкатегория' : 'Подкатегория'}</h3><input class="inp" id="subname" maxlength="30" aria-label="Название" placeholder="Название" value="${esc(name)}">${error ? `<div class="err" role="alert">${esc(error)}</div>` : ''}<div class="sheetbtns"><button type="button" class="btn primary big" data-act="subsave">Сохранить</button>${isNew ? '' : '<button type="button" class="btn danger big" data-act="subdel">Удалить подкатегорию</button>'}<button type="button" class="btn big" data-act="sheetclose">Отмена</button></div>`);
@@ -54,12 +56,19 @@ export function mountCategories(root, ctx) {
       case 'back': location.hash = hashFor('settings'); break;
       case 'edit': location.hash = hashFor('catedit', v.id); break;
       case 'new': location.hash = hashFor('catedit', 'new'); break;
+      case 'tedit': location.hash = hashFor('tcatedit', v.id); break;
+      case 'tnew': location.hash = hashFor('tcatedit', 'new'); break;
       case 'subnew': sheet = { parentId: v.id }; name = ''; error = ''; render(); break;
       case 'subedit': sheet = { id: v.id }; name = ctx.categories.find((c) => c.id === v.id).name; error = ''; render(); break;
       case 'sheetclose': case 'sheetbg': sheet = null; render(); break;
       case 'subsave': saveSub(); break;
       case 'subdel': { const id = sheet.id; sheet = null; location.hash = hashFor('catdel', id); break; }
       case 'move': {
+        if (v.kind === 'tcat') {
+          const ids = ctx.tripCategories.map((c) => c.id);
+          try { await ctx.store.reorderTripCategories(moveId(ids, v.id, +v.dir)); await ctx.reload(); render(); } catch (e) { ctx.toast(fail(e)); }
+          break;
+        }
         const parent = v.kind === 'top' ? null : v.parent;
         const ids = (parent === null ? topsOf(ctx.categories) : subsOf(ctx.categories, parent)).map((c) => c.id);
         try { await ctx.store.reorder(parent, moveId(ids, v.id, +v.dir)); await ctx.reload(); render(); } catch (e) { ctx.toast(fail(e)); }
