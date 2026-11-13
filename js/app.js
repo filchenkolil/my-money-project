@@ -8,6 +8,7 @@ import { routeFromHash, routeParam, hashFor, tabFor } from './router.js';
 import { NO_FILTERS } from './history.js';
 import { UI } from './ui/icons.js';
 import { registerServiceWorker, showUpdateBanner } from './pwa.js';
+import { applyTheme, getTheme } from './theme.js';
 import { createToast, esc } from './ui/dom.js';
 import { mountExpenseForm } from './screens/expense-form.js';
 import { mountHistory } from './screens/history.js';
@@ -58,6 +59,7 @@ function watchKeyboard(app) {
 }
 
 async function boot() {
+  applyTheme(getTheme());
   const app = document.getElementById('app');
   const db = await openDb(dbNameFor(location.pathname), MIGRATIONS);
   const store = createStore(db);

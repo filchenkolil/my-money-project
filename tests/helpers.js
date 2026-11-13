@@ -14,6 +14,7 @@ export async function withStore(fn) {
   try { return await fn(store); } finally { db.close(); }
 }
 export async function openApp({ seed, height = 844, route = '' } = {}) {
+  try { localStorage.removeItem('mymoney.theme'); } catch { /* память недоступна */ }
   await deleteDb(DB);
   await withStore(async (s) => { await s.seedDefaultsIfEmpty(); if (seed) await seed(s); });
   const frame = document.createElement('iframe');
