@@ -8,6 +8,7 @@ import { hashFor } from '../router.js';
 import { monthStripHTML, centerSelected } from '../ui/monthstrip.js';
 
 export function mountHistory(root, ctx) {
+  let disposed = false; // экран закрыт: поздний ответ базы не должен рисовать поверх другого экрана
   const { state } = ctx;
   let sheet = false, banner = false;
   const cat = (id) => ctx.categories.find((c) => c.id === id);
@@ -59,6 +60,7 @@ export function mountHistory(root, ctx) {
   }
 
   function render() {
+    if (disposed) return;
     const top = root.scrollTop, strip = root.querySelector('.mstrip'), sl = strip ? strip.scrollLeft : null;
     root.innerHTML = html();
     root.scrollTop = top;
@@ -91,5 +93,5 @@ export function mountHistory(root, ctx) {
   };
   const off = state.subscribe((what) => { if (what === 'month') { render(); const c = root.querySelector('.mchip[aria-current]'); c?.scrollIntoView({ inline: 'center', block: 'nearest' }); } });
   render();
-  return { dispose: off };
+  return { dispose() { disposed = true; off(); } };
 }

@@ -6,13 +6,14 @@ import { dayTotal, frequentCategories } from '../stats.js';
 import { newForm, afterSave, checkForm, tileList, expenseWord, expenseToForm, diffExpense } from '../form.js';
 import { StoreError } from '../store.js';
 import { icon, UI } from '../ui/icons.js';
-import { esc, dotHTML, header, scrollToEl, reducedMotion, installNotice, sheetHTML } from '../ui/dom.js';
+import { esc, dotHTML, header, scrollToEl, installNotice, sheetHTML } from '../ui/dom.js';
 import { stripHTML, mountStrip } from '../ui/datestrip.js';
 
 /** expense: если задан, экран работает как правка этого расхода. */
 export function mountExpenseForm(root, ctx, { expense = null } = {}) {
   const edit = !!expense;
   let f = edit ? expenseToForm(expense) : newForm(ctx.state.today), addSub = false, newSub = '', review = null;
+  let disposed = false, saving = false, topTimers = [];
   const tops = () => ctx.categories.filter((c) => c.parentId === null);
   // Порядок плиток считаем один раз за открытие экрана: во время ввода пачкой плитки не должны прыгать.
   const order = frequentCategories(ctx.expenses, tops().map((c) => c.id), ctx.state.today);
@@ -44,7 +45,7 @@ export function mountExpenseForm(root, ctx, { expense = null } = {}) {
     const subs = f.categoryId ? ctx.categories.filter((c) => c.parentId === f.categoryId) : [];
     const note = f.note || f.showNote;
     const range = edit ? '' : ` min="${shiftMonthsISO(ctx.state.today, -2)}" max="${shiftMonthsISO(ctx.state.today, 2)}"`;
-    let h = header(edit ? 'Редактирование' : 'Новый расход', `<label class="ib" aria-label="Выбрать другую дату">${UI.cal}<input class="dpick" type="date" id="date" value="${f.date}"${range} tabindex="-1"></label>`, edit);
+    let h = header(edit ? 'Редактирование' : 'Новый расход', `<label class="ib" aria-label="Выбрать другую дату">${UI.cal}<input class="dpick" type="date" id="date" aria-label="Выбрать другую дату" value="${f.date}"${range} tabindex="-1"></label>`, edit);
     h += '<div class="pad">';
     if (!edit) h += installNotice(ctx.expenses.length > 0);
     h += `<input class="inp amt num" id="amt" inputmode="decimal" autocomplete="off" aria-label="Сумма" placeholder="Введите сумму" value="${esc(f.amount)}">`;
@@ -68,6 +69,7 @@ export function mountExpenseForm(root, ctx, { expense = null } = {}) {
   }
 
   function render({ keepScroll = true } = {}) {
+    if (disposed) return; // экран уже закрыт: ответ из базы пришёл после ухода пользователя
     const top = keepScroll ? root.scrollTop : 0;
     root.innerHTML = html();
     mountStrip(root, f.date);
@@ -107,24 +109,39 @@ export function mountExpenseForm(root, ctx, { expense = null } = {}) {
       if (!changes.length) { ctx.toast('Изменений нет'); return; }
       review = { kind: 'edit', changes, patch: r.expense }; render(); return;
     }
+    if (saving) return; // второе нажатие, пока идёт запись, не должно создать дубль
+    saving = true;
     try {
       const rec = await ctx.store.addExpense(r.expense);
       await ctx.reload();
       ctx.state.setMonth(monthKey(rec.date)); // история и аналитика сразу покажут месяц, куда попал расход
       f = afterSave(f); addSub = false;
+      document.activeElement?.blur?.(); // убираем клавиатуру, если она была открыта
       render({ keepScroll: false });
-      root.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
-      focusAmt();
+      backToTop();
       ctx.toast('Сохранено', async () => {
         await ctx.store.deleteExpense(rec.id);
         await ctx.reload();
-        render();
+        render(); // если экран уже закрыт, ничего не нарисует
         ctx.toast('Расход отменён');
       });
-    } catch (e) { f.error = fail(e); render(); }
+    } catch (e) { f.error = fail(e); render(); } finally { saving = false; }
+  }
+
+  /**
+   * Возврат наверх после сохранения: сразу, без анимации, и ещё раз, когда iPhone закончит убирать клавиатуру
+   * (иначе изменение размера экрана сбивает прокрутку). Если пользователь сам коснулся экрана, больше не вмешиваемся.
+   */
+  function backToTop() {
+    topTimers.forEach(clearTimeout);
+    const go = () => { if (!disposed) root.scrollTop = 0; };
+    go();
+    topTimers = [120, 350, 700].map((ms) => setTimeout(go, ms));
+    root.addEventListener('touchstart', () => topTimers.forEach(clearTimeout), { once: true, passive: true });
   }
 
   async function confirm() {
+    if (saving) return; saving = true;
     try {
       if (review.kind === 'del') await ctx.store.deleteExpense(expense.id);
       else await ctx.store.updateExpense(expense.id, review.patch);
@@ -133,7 +150,7 @@ export function mountExpenseForm(root, ctx, { expense = null } = {}) {
       ctx.state.setMonth(monthKey(deleted ? expense.date : review.patch.date));
       location.hash = '#/history';
       ctx.toast(deleted ? 'Запись удалена' : 'Изменения сохранены');
-    } catch (e) { review = null; f.error = fail(e); render(); }
+    } catch (e) { review = null; f.error = fail(e); render(); } finally { saving = false; }
   }
 
   async function saveSub() {
@@ -178,12 +195,16 @@ export function mountExpenseForm(root, ctx, { expense = null } = {}) {
     else if (t.id === 'newsub') newSub = t.value;
   };
   root.onchange = (ev) => { if (ev.target.id === 'date' && ev.target.value) { f.date = ev.target.value; render(); } };
-  root.onkeydown = (ev) => { if (ev.key === 'Enter' && ev.target.id === 'newsub') { ev.preventDefault(); saveSub(); } };
+  root.onkeydown = (ev) => {
+    if (ev.key !== 'Enter') return;
+    if (ev.target.id === 'newsub') { ev.preventDefault(); saveSub(); }
+    else if (ev.target.id === 'amt' || ev.target.id === 'note') { ev.preventDefault(); ev.target.blur(); } // «Ввод» убирает клавиатуру, и «Сохранить» снова видна
+  };
 
   render({ keepScroll: false });
-  if (!edit) focusAmt();
   return {
     /** Приложение вернулось на экран: если сутки сменились, а форма нетронута, дата становится сегодняшней. */
     resume(prevToday) { if (!edit && !f.amount && f.date === prevToday && ctx.state.today !== prevToday) { f.date = ctx.state.today; render(); } },
+    dispose() { disposed = true; topTimers.forEach(clearTimeout); },
   };
 }

@@ -1,6 +1,8 @@
 /* Минимальный тестовый каркас для браузера. Результат пишется на страницу и в консоль. */
 
 const tests = [];
+const notes = [];
+export const note = (s) => notes.push(s); // справочные строки для отчёта (не ошибки)
 export const test = (name, fn) => tests.push({ name, fn });
 
 const norm = (v) => (v && typeof v === 'object' ? (Array.isArray(v) ? v.map(norm) : Object.fromEntries(Object.keys(v).sort().map((k) => [k, norm(v[k])]))) : v);
@@ -19,7 +21,7 @@ export async function runAll(container) {
   for (const t of tests) {
     try { await t.fn(); pass++; } catch (e) { fails.push(`${t.name}: ${e.message}`); }
   }
-  const lines = [`ИТОГО: ${pass} из ${tests.length} прошли, ошибок ${fails.length}`, ...fails.map((f) => 'ОШИБКА ' + f)];
+  const lines = [`ИТОГО: ${pass} из ${tests.length} прошли, ошибок ${fails.length}`, ...fails.map((f) => 'ОШИБКА ' + f), ...notes.map((n) => 'ИНФО ' + n)];
   container.textContent = lines.join('\n');
   container.dataset.done = '1';
   lines.forEach((l) => console.log(l));

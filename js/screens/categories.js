@@ -14,6 +14,7 @@ const pluralSub = (n) => `${n} подкат.`;
 
 /* ---------- дерево ---------- */
 export function mountCategories(root, ctx) {
+  let disposed = false; // экран закрыт: поздний ответ базы не должен рисовать поверх другого экрана
   let sheet = null; // { id } — правка подкатегории или { parentId } — новая
   let name = '', error = '';
 
@@ -37,7 +38,7 @@ export function mountCategories(root, ctx) {
   function arrows(kind, id, i, n, parent = '') {
     return `<span class="arrows"><button type="button" class="ibtn" data-act="move" data-kind="${kind}" data-id="${id}" data-parent="${parent}" data-dir="-1" aria-label="Выше"${i === 0 ? ' disabled' : ''}>${UI.up}</button><button type="button" class="ibtn" data-act="move" data-kind="${kind}" data-id="${id}" data-parent="${parent}" data-dir="1" aria-label="Ниже"${i === n - 1 ? ' disabled' : ''}>${UI.down}</button></span>`;
   }
-  function render() { const t = root.scrollTop; root.innerHTML = html(); root.scrollTop = t; if (sheet) root.querySelector('#subname')?.focus(); }
+  function render() { if (disposed) return; const t = root.scrollTop; root.innerHTML = html(); root.scrollTop = t; if (sheet) root.querySelector('#subname')?.focus(); }
 
   async function saveSub() {
     try {
@@ -69,14 +70,15 @@ export function mountCategories(root, ctx) {
   root.oninput = (ev) => { if (ev.target.id === 'subname') name = ev.target.value; };
   root.onkeydown = (ev) => { if (ev.key === 'Enter' && ev.target.id === 'subname') { ev.preventDefault(); saveSub(); } };
   render();
-  return {};
+  return { dispose() { disposed = true; } };
 }
 
 /* ---------- правка и создание категории ---------- */
 export function mountCategoryEdit(root, ctx, id) {
+  let disposed = false; // экран закрыт: поздний ответ базы не должен рисовать поверх другого экрана
   const isNew = id === 'new', old = isNew ? null : ctx.categories.find((c) => c.id === id);
   let f = isNew ? { name: '', hue: nextHue(ctx.categories), icon: 'tag' } : { name: old.name, hue: old.hue, icon: old.icon };
-  let review = null, error = '';
+  let review = null, error = '', applying = false;
 
   function html() {
     let h = header(isNew ? 'Новая категория' : 'Изменить категорию', '', true) + '<div class="pad">';
@@ -90,16 +92,17 @@ export function mountCategoryEdit(root, ctx, id) {
     if (review) h += sheetHTML(`<h3>Проверьте изменения</h3><div class="diff">${review.map((c) => `<div class="d"><span class="small muted">${esc(c.label)}</span><span><s>${esc(c.from)}</s> → <b>${esc(c.to)}</b></span></div>`).join('')}</div><div class="sheetbtns"><button type="button" class="btn primary big" data-act="confirm">Применить изменения</button><button type="button" class="btn big" data-act="unreview">Вернуться к редактированию</button></div>`);
     return h;
   }
-  function render() { const t = root.scrollTop; root.innerHTML = html(); root.scrollTop = t; }
+  function render() { if (disposed) return; const t = root.scrollTop; root.innerHTML = html(); root.scrollTop = t; }
 
   async function apply() {
+    if (applying) return; applying = true;
     try {
       if (isNew) await ctx.store.addCategory({ name: f.name, icon: f.icon, hue: f.hue });
       else await ctx.store.updateCategory(id, { name: f.name, icon: f.icon, hue: f.hue });
       await ctx.reload();
       location.hash = hashFor('categories');
       ctx.toast(isNew ? 'Категория добавлена' : 'Категория сохранена');
-    } catch (e) { review = null; error = fail(e); render(); }
+    } catch (e) { review = null; error = fail(e); render(); } finally { applying = false; }
   }
   root.onclick = (ev) => {
     const b = ev.target.closest('[data-act]'); if (!b) return;
@@ -123,18 +126,19 @@ export function mountCategoryEdit(root, ctx, id) {
   };
   root.oninput = (ev) => { if (ev.target.id === 'cename') f.name = ev.target.value; };
   render();
-  return {};
+  return { dispose() { disposed = true; } };
 }
 
 /* ---------- удаление с переносом расходов ---------- */
 export function mountCategoryDelete(root, ctx, id) {
+  let disposed = false; // экран закрыт: поздний ответ базы не должен рисовать поверх другого экрана
   const target = ctx.categories.find((c) => c.id === id);
   const isSub = target.parentId !== null, parent = isSub ? ctx.categories.find((c) => c.id === target.parentId) : null;
   const list = expensesIn(ctx.expenses, target).sort((a, b) => (a.date < b.date ? 1 : -1));
   const options = transferOptions(ctx.categories, target);
   const PER_LIMIT = 100; // для больших категорий выбор по одному расходу не показываем: только «перенести все»
   const perItem = list.length <= PER_LIMIT;
-  let all = '', per = {}, confirm = false, error = '';
+  let all = '', per = {}, confirm = false, error = '', running = false;
   const total = list.reduce((s, e) => s + e.amount, 0);
   const title = (isSub ? 'Удаление «' + parent.name + ' › ' : 'Удаление «') + target.name + '»';
   const lastCategory = !isSub && topsOf(ctx.categories).length <= 1;
@@ -155,9 +159,10 @@ export function mountCategoryDelete(root, ctx, id) {
     if (confirm) h += sheetHTML(`<h3>Удалить «${esc(target.name)}»?</h3><div class="card">${list.length ? `Расходов к переносу: ${list.length}. ` : ''}${isSub ? 'подкатегория' : 'категория'} исчезнет. Это нельзя отменить.</div><div class="sheetbtns"><button type="button" class="btn danger big" data-act="confirm">Удалить</button><button type="button" class="btn big" data-act="cancel">Отмена</button></div>`);
     return h;
   }
-  function render() { const t = root.scrollTop; root.innerHTML = html(); root.scrollTop = t; }
+  function render() { if (disposed) return; const t = root.scrollTop; root.innerHTML = html(); root.scrollTop = t; }
 
   async function run() {
+    if (running) return; running = true;
     const plan = transferPlan(list, per, all);
     try {
       if (isSub) await ctx.store.deleteSubcategory(id, { transfers: plan.transfers, allTo: plan.allTo });
@@ -166,7 +171,7 @@ export function mountCategoryDelete(root, ctx, id) {
       if (ctx.state.filters.categoryId === id || ctx.state.filters.subcategoryId === id) ctx.state.filters = { categoryId: '', subcategoryId: '', regularOnly: false };
       location.hash = hashFor('categories');
       ctx.toast('Удалено');
-    } catch (e) { confirm = false; error = fail(e); render(); }
+    } catch (e) { confirm = false; error = fail(e); render(); } finally { running = false; }
   }
   root.onclick = (ev) => {
     const b = ev.target.closest('[data-act]'); if (!b) return;
@@ -184,5 +189,5 @@ export function mountCategoryDelete(root, ctx, id) {
     render();
   };
   render();
-  return {};
+  return { dispose() { disposed = true; } };
 }

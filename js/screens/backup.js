@@ -12,6 +12,7 @@ import { hashFor } from '../router.js';
 const fail = (e) => (e instanceof StoreError ? e.message : 'Не удалось выполнить. Данные не изменились, попробуйте ещё раз.');
 
 export function mountBackup(root, ctx) {
+  let disposed = false; // экран закрыт: поздний ответ базы не должен рисовать поверх другого экрана
   const { state } = ctx;
   let period = '', plan = null, error = '', last = null, busy = false;
   const months = () => monthStripKeys(ctx.expenses, state.today).reverse();
@@ -34,7 +35,7 @@ export function mountBackup(root, ctx) {
     }
     return h;
   }
-  function render() { const t = root.scrollTop; root.innerHTML = html(); root.scrollTop = t; }
+  function render() { if (disposed) return; const t = root.scrollTop; root.innerHTML = html(); root.scrollTop = t; }
 
   async function doExport(kind) {
     if (busy) return; busy = true;
@@ -58,12 +59,13 @@ export function mountBackup(root, ctx) {
     render();
   }
   async function restore() {
+    if (busy) return; busy = true;
     try {
       const r = await ctx.store.applyRestore(plan);
       plan = null; await ctx.reload();
       state.setMonth(r.expenses ? [...ctx.expenses].sort((a, b) => (a.date < b.date ? 1 : -1))[0].date.slice(0, 7) : state.month);
       render(); ctx.toast(`Добавлено: ${expenseWord(r.expenses)}`);
-    } catch (e) { plan = null; error = fail(e); render(); }
+    } catch (e) { plan = null; error = fail(e); render(); } finally { busy = false; }
   }
 
   root.onclick = (ev) => {
@@ -82,14 +84,15 @@ export function mountBackup(root, ctx) {
     else if (ev.target.id === 'file') { const f = ev.target.files?.[0]; if (f) onFile(f); }
   };
   render();
-  return {};
+  return { dispose() { disposed = true; } };
 }
 
 export function mountReset(root, ctx) {
+  let disposed = false; // экран закрыт: поздний ответ базы не должен рисовать поверх другого экрана
   let confirm = false, error = '';
   const html = () => header('Сброс данных', '', true) + `<div class="pad"><div class="err" style="margin:0 0 12px">Будут удалены все расходы, категории и настройки на этом телефоне. Восстановить их можно только из файла JSON.</div><button type="button" class="btn big" data-act="export" style="margin-bottom:8px">Сначала сделать экспорт</button><button type="button" class="btn danger big" data-act="ask">Удалить все данные</button>${error ? `<div class="err" role="alert">${esc(error)}</div>` : ''}</div>` +
     (confirm ? sheetHTML('<h3>Удалить все данные?</h3><div class="card">Это нельзя отменить. Расходы и категории исчезнут, останется стартовый набор категорий.</div><div class="sheetbtns"><button type="button" class="btn danger big" data-act="confirm">Да, удалить всё</button><button type="button" class="btn big" data-act="cancel">Отмена</button></div>') : '');
-  function render() { root.innerHTML = html(); }
+  function render() { if (disposed) return; root.innerHTML = html(); }
   root.onclick = async (ev) => {
     const b = ev.target.closest('[data-act]'); if (!b) return;
     if (b.dataset.act === 'sheetbg' && ev.target !== b) return;
@@ -108,6 +111,6 @@ export function mountReset(root, ctx) {
     }
   };
   render();
-  return {};
+  return { dispose() { disposed = true; } };
 }
 

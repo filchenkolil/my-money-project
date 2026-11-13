@@ -27,6 +27,22 @@ function tabsHTML(active) {
   }).join('');
 }
 
+/**
+ * Пока пользователь вводит текст (сумма, комментарий, название), нижняя панель и «Сохранить» прячутся: они только отнимают место
+ * над клавиатурой. Ориентируемся на фокус в поле, а не на размер экрана: в Safari размер экрана при клавиатуре не всегда меняется.
+ * Кнопка «Ввод» на клавиатуре и «✓» убирают фокус, и панели возвращаются.
+ */
+const NON_TEXT = ['date', 'checkbox', 'radio', 'file', 'button', 'submit', 'hidden', 'range'];
+export const isTextField = (el) => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !NON_TEXT.includes(el.type)));
+function watchTyping(app) {
+  let timer = 0;
+  document.addEventListener('focusin', (e) => { if (isTextField(e.target)) { clearTimeout(timer); app.classList.add('typing'); } });
+  document.addEventListener('focusout', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { if (!isTextField(document.activeElement)) app.classList.remove('typing'); }, 100); // пауза: фокус может перейти в другое поле
+  });
+}
+
 /** Когда открыта клавиатура, нижняя панель прячется, а высота экрана равна видимой части: «Сохранить» остаётся над клавиатурой. */
 function watchKeyboard(app) {
   const vv = window.visualViewport;
@@ -95,6 +111,7 @@ async function boot() {
     current?.resume?.(prev);
   });
   watchKeyboard(app);
+  watchTyping(app);
   registerServiceWorker({ onUpdate: (apply) => showUpdateBanner(app, apply) });
   show();
 }

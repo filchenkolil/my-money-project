@@ -228,3 +228,7 @@ select.inp[disabled] { background-color: var(--surface2); color: var(--muted); }
 .filebtn { cursor: pointer; }
 .updatebar { flex: none; display: flex; gap: 12px; align-items: center; background: var(--lime); color: #111; padding: 8px 16px; font-weight: 600; }
 .updatebar .btn { background: #111; color: #fff; min-height: 44px; }
+
+/* Ввод текста: пока в поле мигает курсор, нижняя панель и «Сохранить» скрыты */
+#app.typing .tabs, #app.typing .savebar { display: none; }
+#app.typing .toast { bottom: 96px; }

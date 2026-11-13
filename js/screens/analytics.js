@@ -87,7 +87,8 @@ export function mountAnalytics(root, ctx, param) {
 
   function categoryHTML() {
     const tops = topsOf(ctx.categories);
-    if (!state.dashCat || !cat(state.dashCat.split(':')[1])) state.dashCat = 'c:' + (tops[0]?.id ?? '');
+    const valid = (v) => { const [k, c, s] = String(v ?? '').split(':'); return (k === 'c' && !!cat(c)) || (k === 's' && cat(s)?.parentId === c && !!cat(c)); }; // категория или подкатегория могли быть удалены
+    if (!valid(state.dashCat)) state.dashCat = 'c:' + (tops[0]?.id ?? '');
     const [kind, categoryId, subcategoryId] = state.dashCat.split(':');
     const sel = kind === 's' ? { categoryId, subcategoryId } : { categoryId };
     const name = cat(categoryId).name + (subcategoryId ? ' › ' + cat(subcategoryId).name : '');
