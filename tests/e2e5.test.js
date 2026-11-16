@@ -14,8 +14,8 @@ test('настройки → категории: дерево с подкате�
   const a = await openApp({ route: '#/settings' });
   try {
     await waitFor(() => a.q('.setrow'), 'настройки');
-    eq(a.qa('.setrow').length, 3);
-    a.click(a.qa('.setrow')[0]); await waitFor(() => a.h1() === 'Категории', 'категории');
+    eq(a.qa('.setrow').length, 4);
+    a.click(a.qa('.setrow')[1]); await waitFor(() => a.h1() === 'Категории', 'категории');
     eq(a.qa('.tree .cat:not(.tcatrow)').length, 15);
     const names = () => a.qa('.cat:not(.tcatrow) .catname b').map((b) => b.textContent);
     eq(names().slice(0, 2), ['Продукты', 'Транспорт']);

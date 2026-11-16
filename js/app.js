@@ -13,6 +13,7 @@ import { createToast, esc } from './ui/dom.js';
 import { mountExpenseForm } from './screens/expense-form.js';
 import { mountHistory } from './screens/history.js';
 import { mountSettings } from './screens/settings.js';
+import { mountAI } from './screens/ai.js';
 import { mountBackup, mountReset } from './screens/backup.js';
 import { mountTrips, mountTrip, mountTripEdit, mountTripDelete } from './screens/trips.js';
 import { mountTripCategoryEdit, mountTripCategoryDelete } from './screens/trip-categories.js';
@@ -90,6 +91,7 @@ async function boot() {
     analytics: (dash) => mountAnalytics(body, ctx, dash),
     cat: (id) => (ctx.categories.some((c) => c.id === id && c.parentId === null) ? mountCategoryDetail(body, ctx, id) : hashFor('analytics')),
     settings: () => mountSettings(body, ctx),
+    ai: () => mountAI(body, ctx),
     categories: () => mountCategories(body, ctx),
     backup: () => mountBackup(body, ctx),
     reset: () => mountReset(body, ctx),

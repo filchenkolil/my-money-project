@@ -27,6 +27,7 @@
     for (const [cat, n] of plan) for (let i = 0; i < n; i++) await s.addExpense({ amount: 10000 + i * 700, date: dayAgo(i % 20), categoryId: cat });
     await s.addExpense({ amount: 53000, date: today, categoryId: 'prod' });
     await s.addExpense({ amount: 21000, date: today, categoryId: 'trans' });
+    await s.addExpense({ amount: 1680000, date: dayAgo(25), categoryId: 'prod', isRegular: true }); await s.addExpense({ amount: 1680000, date: today, categoryId: 'prod', isRegular: true }); await s.addExpense({ amount: 250000, date: dayAgo(2), categoryId: 'trans', isRegular: true });
     const sd = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv'); };
     const tr = await s.addTrip({ name: 'Турция', start: sd(1), end: sd(5), currency: 'TRY', rate: '2,35' });
     await s.addTripExpense({ tripId: tr.id, categoryId: 'tc.tkt', amount: 2840000, isRub: true, date: sd(-6), note: 'Москва — Анталья' });
@@ -84,7 +85,7 @@
     await snap(a, 'edit-review'); a.f.remove();
     a = await open(); { const s = a.q('#wk'); s.scrollLeft = s.scrollWidth * 0.8; await sleep(500); } await snap(a, 'add-strip'); a.f.remove();
     a = await open(); a.click(a.qa('.seg button')[1]); await sleep(300); a.type('1250'); await sleep(100); a.click(a.qa('.tile').find((t) => t.textContent.trim() === 'Рестораны')); await sleep(900); await snap(a, 'add-trip'); a.f.remove();
-    for (const [r, n] of [['#/trips', 'trips'], ['#/trip/TRIP', 'trip'], ['#/tripedit/TRIP', 'trip-edit'], ['#/tripedit/new', 'trip-new'], ['#/analytics/trips', 'an-trips'], ['#/analytics', 'an-overview'], ['#/analytics/compare', 'an-compare'], ['#/analytics/category', 'an-category'], ['#/categories', 'cats'], ['#/catedit/prod', 'cat-edit'], ['#/catdel/pet', 'cat-del']]) {
+    for (const [r, n] of [['#/trips', 'trips'], ['#/trip/TRIP', 'trip'], ['#/tripedit/TRIP', 'trip-edit'], ['#/tripedit/new', 'trip-new'], ['#/analytics/trips', 'an-trips'], ['#/analytics/regular', 'an-regular'], ['#/analytics/pace', 'an-pace'], ['#/ai', 'ai'], ['#/analytics', 'an-overview'], ['#/analytics/compare', 'an-compare'], ['#/analytics/category', 'an-category'], ['#/categories', 'cats'], ['#/catedit/prod', 'cat-edit'], ['#/catdel/pet', 'cat-del']]) {
       a = await open(r); await sleep(500); await snap(a, n); a.f.remove();
     }
     a = await open('#/settings'); await snap(a, 'settings'); a.f.remove();

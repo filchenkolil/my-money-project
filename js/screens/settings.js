@@ -6,7 +6,7 @@ import { SCHEMA_VERSION } from '../migrations.js';
 import { THEMES, getTheme, setTheme } from '../theme.js';
 import { hashFor } from '../router.js';
 
-const ROWS = [['categories', 'Категории и подкатегории'], ['backup', 'Экспорт и восстановление'], ['reset', 'Сброс всех данных']];
+const ROWS = [['ai', 'Обсуждение AI'], ['categories', 'Категории и подкатегории'], ['backup', 'Экспорт и восстановление'], ['reset', 'Сброс всех данных']];
 
 export function mountSettings(root, ctx) {
   const theme = getTheme();

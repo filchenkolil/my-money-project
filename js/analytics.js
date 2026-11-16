@@ -2,7 +2,7 @@
    Поездки (v2) подмешиваются через tripData = { trips, tripExpenses }: месяц считает расходы поездки строго по их датам. */
 import { addMonths, monthProgress } from './dates.js';
 import { monthTotal, categoryTotals, subTotals, delta, share, series, summary, topChanges } from './stats.js';
-import { monthTripSegments, tripMonthTotals, tripSummary } from './trips.js';
+import { monthTripSegments, tripMonthTotals, tripSummary, expenseRub } from './trips.js';
 
 const NO_TRIPS = { trips: [], tripExpenses: [] };
 const tripTotal = (tripData, key) => tripMonthTotals(tripData.trips, tripData.tripExpenses)[key] ?? 0;
@@ -48,6 +48,49 @@ export function categoryDetail(expenses, key, categoryId, subName) {
   const total = list.reduce((s, e) => s + e.amount, 0), subs = subTotals(expenses, key, categoryId);
   const parts = Object.entries(subs).map(([id, amount]) => ({ id, name: id ? subName(id) : 'Без подкатегории', amount })).sort((a, b) => b.amount - a.amount);
   return { total, subs: parts.length > 1 || (parts.length === 1 && parts[0].id) ? parts : [], list };
+}
+
+const regOf = (expenses, key) => expenses.filter((e) => e.isRegular && e.date.slice(0, 7) === key);
+const sumOf = (l) => l.reduce((s, e) => s + e.amount, 0);
+
+/**
+ * «Регулярные»: сумма регулярных расходов месяца и изменение к прошлому, доля регулярных в расходах месяца (с поездками)
+ * по каждому месяцу, категории регулярных с рядом по месяцам и подкатегориями (выбранный и прошлый месяц).
+ */
+export function regularView(expenses, keys, key, tripData = NO_TRIPS) {
+  const pk = addMonths(key, -1), cur = sumOf(regOf(expenses, key)), prev = sumOf(regOf(expenses, pk));
+  const months = keys.map((k) => { const regular = sumOf(regOf(expenses, k)), total = monthTotalWithTrips(expenses, k, tripData); return { key: k, regular, total, pct: share(regular, total) }; });
+  const ids = [...new Set([...regOf(expenses, key), ...regOf(expenses, pk)].map((e) => e.categoryId))];
+  const cats = ids.map((categoryId) => {
+    const sub = (k) => { const out = {}; for (const e of regOf(expenses, k)) if (e.categoryId === categoryId) { const s = e.subcategoryId ?? ''; out[s] = (out[s] ?? 0) + e.amount; } return out; };
+    const sc = sub(key), sp = sub(pk), sids = [...new Set([...Object.keys(sc), ...Object.keys(sp)])];
+    const c = sumOf(regOf(expenses, key).filter((e) => e.categoryId === categoryId)), p = sumOf(regOf(expenses, pk).filter((e) => e.categoryId === categoryId));
+    return { categoryId, cur: c, prev: p, delta: delta(c, p), values: keys.map((k) => sumOf(regOf(expenses, k).filter((e) => e.categoryId === categoryId))),
+      subs: sids.map((id) => ({ id, cur: sc[id] ?? 0, prev: sp[id] ?? 0 })).sort((a, b) => b.cur - a.cur || b.prev - a.prev) };
+  }).sort((a, b) => b.cur - a.cur || b.prev - a.prev);
+  const m = months.find((x) => x.key === key) ?? { regular: 0, total: 0, pct: 0 };
+  return { cur, prev, hasPrev: prev > 0, prevKey: pk, delta: delta(cur, prev), months, pct: m.pct, total: m.total, cats };
+}
+
+/** Все траты по датам (рубли): обычные расходы и расходы поездок. */
+function dated(expenses, tripData) {
+  const byId = new Map(tripData.trips.map((t) => [t.id, t]));
+  return [...expenses.map((e) => ({ date: e.date, amount: e.amount })), ...tripData.tripExpenses.filter((e) => byId.has(e.tripId)).map((e) => ({ date: e.date, amount: expenseRub(e, byId.get(e.tripId)) }))];
+}
+
+/**
+ * «Темп месяца»: накопленная сумма по дням выбранного месяца и прошлого. Идущий месяц считается до сегодняшнего дня,
+ * прошлый показывается целиком; projection — сумма к концу месяца при текущем темпе (только для идущего месяца).
+ */
+export function paceView(expenses, key, today, tripData = NO_TRIPS) {
+  const all = dated(expenses, tripData), pk = addMonths(key, -1), pr = monthProgress(today, key);
+  const days = pr.days, cutoff = pr.future ? 0 : pr.complete ? days : pr.day;
+  const line = (k, n) => { const per = new Array(n).fill(0); for (const e of all) if (e.date.slice(0, 7) === k) { const d = Number(e.date.slice(8, 10)); if (d <= n) per[d - 1] += e.amount; } let s = 0; return per.map((v) => (s += v)); };
+  const cur = line(key, days).slice(0, cutoff), prevDays = monthProgress(today, pk).days, prev = line(pk, prevDays);
+  const total = cur.at(-1) ?? 0, prevAtSame = cutoff > 0 ? (prev[Math.min(cutoff, prevDays) - 1] ?? 0) : 0;
+  const running = !pr.complete && !pr.future && cutoff > 0;
+  return { key, prevKey: pk, days, prevDays, day: cutoff, running, cur, prev, total, prevTotal: prev.at(-1) ?? 0, prevAtSame, delta: delta(total, prevAtSame),
+    projection: running ? Math.round((total / cutoff) * days) : null, perDay: cutoff > 0 ? Math.round(total / cutoff) : 0 };
 }
 
 /** Дашборд «Поездки»: сводка по каждой поездке (стоимость, в день, структура по категориям), свежие сверху. */

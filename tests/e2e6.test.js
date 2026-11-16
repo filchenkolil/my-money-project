@@ -33,7 +33,7 @@ test('обзор: итог месяца, идущий месяц, изменен
     eq(rows, ['Продукты', 'Питомец', 'Подарки']);
     ok(a.qa('.legrow')[0].querySelector('.pc').textContent.includes('50%'));
     ok(a.qa('.legrow')[0].querySelector('.delta.up'), 'рост оранжевым со стрелкой');
-    eq(a.qa('.dchip').map((d) => d.textContent), ['Обзор', 'Месяц к месяцу', 'Категория', 'Поездки']);
+    eq(a.qa('.dchip').map((d) => d.textContent), ['Обзор', 'Месяц к месяцу', 'Категория', 'Регулярные', 'Темп месяца', 'Поездки']);
     // прошлый месяц закончен: цветная стрелка и нет пометки
     a.click(a.qa('.mchip').find((c) => !c.hasAttribute('aria-current'))); await sleep(80);
     ok(a.q('.hero .big').textContent.includes('1 500'));

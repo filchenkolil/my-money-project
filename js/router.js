@@ -1,5 +1,5 @@
 /* Разделы приложения и разбор адреса. Адрес вида #/history, #/edit/<id>, #/analytics/compare. */
-export const ROUTES = ['add', 'history', 'analytics', 'settings', 'edit', 'cat', 'categories', 'catedit', 'catdel', 'backup', 'reset', 'trips', 'trip', 'tripedit', 'tripdel', 'tcatedit', 'tcatdel'];
+export const ROUTES = ['add', 'history', 'analytics', 'settings', 'edit', 'cat', 'categories', 'catedit', 'catdel', 'backup', 'reset', 'trips', 'trip', 'tripedit', 'tripdel', 'tcatedit', 'tcatdel', 'ai'];
 export const DEFAULT_ROUTE = 'add';
 
 const parts = (hash) => String(hash || '').replace(/^#\/?/, '').split('?')[0].split('/');
@@ -12,5 +12,5 @@ export function routeFromHash(hash) {
 export const routeParam = (hash) => { const p = parts(hash)[1]; return p ? decodeURIComponent(p) : null; };
 export const hashFor = (route, param) => '#/' + route + (param ? '/' + encodeURIComponent(param) : '');
 /** Какая вкладка нижней панели подсвечена на этом разделе. */
-const TAB = { edit: 'history', cat: 'analytics', categories: 'settings', catedit: 'settings', catdel: 'settings', backup: 'settings', reset: 'settings', trip: 'trips', tripedit: 'trips', tripdel: 'trips', tcatedit: 'settings', tcatdel: 'settings' };
+const TAB = { edit: 'history', cat: 'analytics', categories: 'settings', catedit: 'settings', catdel: 'settings', backup: 'settings', reset: 'settings', trip: 'trips', tripedit: 'trips', tripdel: 'trips', tcatedit: 'settings', tcatdel: 'settings', ai: 'analytics' };
 export const tabFor = (route) => TAB[route] ?? route;

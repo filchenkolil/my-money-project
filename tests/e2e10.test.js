@@ -200,7 +200,7 @@ test('аналитика: поездка отдельным сегментом �
     a.click(a.qa('.legrow').find((r) => r.textContent.includes('Турция'))); await waitFor(() => a.h1() === 'Турция', 'экран поездки');
     await a.go('#/analytics/compare', () => a.q('.mcol'));
     // дашборд «Поездки»
-    a.click(a.qa('.dchip')[3]); await waitFor(() => a.q('.tripcard'), 'дашборд');
+    a.click(a.qa('.dchip')[5]); await waitFor(() => a.q('.tripcard'), 'дашборд');
     ok(a.q('.tripcard').textContent.includes('Турция') && a.q('.tripcard .stack') && a.q('.tripcard').textContent.includes('в день'));
     a.click(a.q('.tripcard')); await waitFor(() => a.h1() === 'Турция', 'переход');
   } finally { a.close(); }

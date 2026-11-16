@@ -1,6 +1,6 @@
 /* Служебный скрипт: приложение открывается без интернета, новая версия ставится только после нажатия «Обновить».
    Список файлов и номер версии между маркерами обновляет tools/sw-sync.sh (запускать перед каждой публикацией). */
-/* VERSION-START */ const VERSION = '2.0.2'; /* VERSION-END */
+/* VERSION-START */ const VERSION = '2.1.0'; /* VERSION-END */
 const CACHE = 'mymoney-' + VERSION;
 const FILES = [
   /* FILES-START */
@@ -26,6 +26,7 @@ const FILES = [
   'js/money.js',
   'js/pwa.js',
   'js/router.js',
+  'js/screens/ai.js',
   'js/screens/analytics.js',
   'js/screens/backup.js',
   'js/screens/categories.js',
@@ -38,6 +39,7 @@ const FILES = [
   'js/state.js',
   'js/stats.js',
   'js/store.js',
+  'js/summary.js',
   'js/theme.js',
   'js/trips.js',
   'js/ui/datestrip.js',

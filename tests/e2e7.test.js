@@ -127,8 +127,8 @@ test('настройки: переходы к экспорту и сбросу',
   const a = await openApp({ route: '#/settings' });
   try {
     await waitFor(() => a.q('.setrow'), 'настройки');
-    a.click(a.qa('.setrow')[1]); await waitFor(() => a.h1() === 'Экспорт и восстановление', 'экспорт');
+    a.click(a.qa('.setrow')[2]); await waitFor(() => a.h1() === 'Экспорт и восстановление', 'экспорт');
     a.click(a.q('[data-act="back"]')); await waitFor(() => a.h1() === 'Настройки', 'назад');
-    a.click(a.qa('.setrow')[2]); await waitFor(() => a.h1() === 'Сброс данных', 'сброс');
+    a.click(a.qa('.setrow')[3]); await waitFor(() => a.h1() === 'Сброс данных', 'сброс');
   } finally { a.close(); }
 });

@@ -33,7 +33,7 @@ test('настройки: переключатель темы меняет цв�
     eq(css(a, '--surface'), '#ffffff'); eq(a.doc.documentElement.dataset.theme, 'light');
     a.click(a.qa('.seg button')[2]); await sleep(50);
     // регрессия: после выбора темы строки настроек должны открываться (у <html> появился data-theme)
-    for (const [row, title] of [[0, 'Категории'], [1, 'Экспорт и восстановление']]) {
+    for (const [row, title] of [[1, 'Категории'], [2, 'Экспорт и восстановление']]) {
       a.click(a.qa('.setrow')[row]); await waitFor(() => a.h1() === title, 'раздел «' + title + '»');
       a.click(a.q('[data-act="back"]')); await waitFor(() => a.q('.seg'), 'назад в настройки');
     }
