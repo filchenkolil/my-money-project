@@ -48,6 +48,7 @@ const FILES = [
   'js/ui/icons.js',
   'js/ui/monthstrip.js',
   'js/version.js',
+  'manifest.webmanifest',
   /* FILES-END */
 ];
 
