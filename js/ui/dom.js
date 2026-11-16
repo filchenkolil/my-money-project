@@ -7,7 +7,7 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESC[c]);
 /** Цвет категории из оттенка палитры; насыщенность и яркость зависят от темы (см. --cs, --cl). */
 export const hueColor = (hue) => `hsl(${hue ?? 200} var(--cs) var(--cl))`;
 
-export const dotHTML = (cat) => `<span class="dot" style="background:${hueColor(cat.hue)}">${icon(cat.icon)}</span>`;
+export const dotHTML = (cat) => `<span class="dot" style="--h:${cat.hue ?? 200}">${icon(cat.icon)}</span>`;
 
 export const header = (title, right = '', back = false) => `<div class="hdr">${back ? '<button type="button" class="ib" data-act="back" aria-label="Назад">' + UI.back + '</button>' : ''}<h1${back ? ' class="sub"' : ''}>${esc(title)}</h1>${right}</div>`;
 

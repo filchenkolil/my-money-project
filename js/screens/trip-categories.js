@@ -20,7 +20,7 @@ export function mountTripCategoryEdit(root, ctx, id) {
 
   function html() {
     let h = header(isNew ? 'Новая категория поездки' : 'Изменить категорию поездки', '', true) + '<div class="pad">';
-    h += `<div class="row" style="margin-top:4px"><span class="dot" style="background:${hueColor(f.hue)};width:56px;height:56px">${icon(f.icon)}</span><input class="inp" id="cename" maxlength="30" value="${esc(f.name)}" aria-label="Название" placeholder="Название" style="flex:1;min-width:0"></div>`;
+    h += `<div class="row" style="margin-top:4px"><span class="dot" style="--h:${f.hue ?? 200};width:56px;height:56px">${icon(f.icon)}</span><input class="inp" id="cename" maxlength="30" value="${esc(f.name)}" aria-label="Название" placeholder="Название" style="flex:1;min-width:0"></div>`;
     if (error) h += `<div class="err" role="alert">${esc(error)}</div>`;
     h += '<div class="lbl">Цвет</div><div class="pal">' + PALETTE.map((hh) => `<button type="button" data-act="hue" data-h="${hh}" style="background:${hueColor(hh)}" aria-pressed="${f.hue === hh}" aria-label="Цвет ${hh}"></button>`).join('') + '</div>';
     h += '<div class="lbl">Значок</div><div class="icons">' + ICONS.map((k) => `<button type="button" class="icb" data-act="icon" data-v="${k}" aria-pressed="${f.icon === k}" aria-label="Значок ${k}">${icon(k)}</button>`).join('') + '</div>';

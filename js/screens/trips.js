@@ -13,7 +13,7 @@ import { hashFor } from '../router.js';
 const fail = (e) => (e instanceof StoreError ? e.message : 'Не удалось сохранить. Данные не изменились, попробуйте ещё раз.');
 const tcat = (ctx, id) => ctx.tripCategories.find((c) => c.id === id);
 const colorOf = (ctx, id) => hueColor(tcat(ctx, id)?.hue ?? 200);
-export const tripDot = (c, size = 40) => `<span class="dot" style="background:${hueColor(c?.hue ?? 200)};width:${size}px;height:${size}px">${icon(c?.icon ?? 'tag')}</span>`;
+export const tripDot = (c, size = 40) => `<span class="dot" style="--h:${c?.hue ?? 200};width:${size}px;height:${size}px">${icon(c?.icon ?? 'tag')}</span>`;
 
 /** Сумма расхода поездки для списков: в валюте (если не рубли) и рядом рубли. */
 export function tripAmountHTML(e, trip) {

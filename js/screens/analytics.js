@@ -232,7 +232,7 @@ export function mountCategoryDetail(root, ctx, id) {
     const d = categoryDetail(ctx.expenses, state.month, id, subName);
     const prevKey = addMonths(state.month, -1);
     const prev = categoryView(ctx.expenses, [prevKey, state.month], state.month, { categoryId: id });
-    let h = header(c.name, `<span class="dot" style="background:${hueColor(c.hue)};width:44px;height:44px">${icon(c.icon)}</span>`, true) + '<div class="pad">';
+    let h = header(c.name, `<span class="dot" style="--h:${c.hue ?? 200};width:44px;height:44px">${icon(c.icon)}</span>`, true) + '<div class="pad">';
     h += `<div class="card"><div class="small muted">${esc(monthLabel(state.month))}</div><div class="total num">${formatRub(d.total)}</div>`;
     if (prev.hasPrev) h += deltaLine({ delta: prev.delta, hasPrev: true, prevKey, prevTotal: prev.prev, complete: state.month < state.today.slice(0, 7) });
     h += '</div>';
