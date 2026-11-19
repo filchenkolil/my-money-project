@@ -1,11 +1,12 @@
 /* История: лента месяцев (общая с аналитикой), сумма месяца, список по дням, фильтры. */
 import { formatRub } from '../money.js';
 import { monthName, monthKey, addDays, dayLong, exportReminderDue } from '../dates.js';
-import { selectMonth, groupByDay, monthStripKeys, filtersActive, NO_FILTERS } from '../history.js';
+import { selectMonth, selectMonthWithTrips, groupByDay, monthStripKeys, filtersActive, NO_FILTERS } from '../history.js';
 import { UI } from '../ui/icons.js';
 import { esc, dotHTML, header, installNotice, sheetHTML } from '../ui/dom.js';
 import { hashFor } from '../router.js';
 import { tripMonthTotals } from '../trips.js';
+import { tripDot, tripAmountHTML } from './trips.js';
 import { monthStripHTML, centerSelected } from '../ui/monthstrip.js';
 
 export function mountHistory(root, ctx) {
@@ -22,14 +23,24 @@ export function mountHistory(root, ctx) {
     if (banner) render();
   })();
 
+  const td = () => ({ trips: ctx.trips, tripExpenses: ctx.tripExpenses });
+  const tcat = (id) => ctx.tripCategories.find((c) => c.id === id);
+
+  /** Расход поездки: значок категории поездки, название поездки рядом, сумма в рублях (и в валюте). */
+  function tripRow(e) {
+    const c = tcat(e.categoryId);
+    return `<button type="button" class="rec" data-act="edit" data-id="${esc(e.id)}">${tripDot(c)}<span class="sp"><span class="t">${esc(c?.name ?? 'Поездка')} <span class="muted" style="font-weight:400">· ${esc(e.trip.name)}</span><span class="badge trip">поездка</span></span>${e.note ? `<br><span class="n">${esc(e.note)}</span>` : ''}</span>${tripAmountHTML(e.orig, e.trip)}</button>`;
+  }
+
   function recRow(e) {
+    if (e.trip) return tripRow(e);
     const c = cat(e.categoryId), s = e.subcategoryId ? cat(e.subcategoryId) : null;
     return `<button type="button" class="rec" data-act="edit" data-id="${esc(e.id)}">${dotHTML(c)}<span class="sp"><span class="t">${esc(c.name)}${s ? ` <span class="muted" style="font-weight:400">· ${esc(s.name)}</span>` : ''}${e.isRegular ? '<span class="badge">рег.</span>' : ''}</span>${e.note ? `<br><span class="n">${esc(e.note)}</span>` : ''}</span><span class="a num">${formatRub(e.amount)}</span></button>`;
   }
 
 
   function listHTML() {
-    const f = state.filters, active = filtersActive(f), list = selectMonth(ctx.expenses, state.month, f);
+    const f = state.filters, active = filtersActive(f), list = selectMonthWithTrips(ctx.expenses, td(), state.month, f);
     if (!list.length) {
       return `<div class="empty" style="padding-top:32px"><p>${active ? 'По этим условиям ничего не найдено.' : 'В этом месяце расходов пока нет.'}</p>${active ? '<button type="button" class="btn" data-act="fltreset">Сбросить фильтры</button>' : '<button type="button" class="btn primary" data-act="add">Добавить расход</button>'}</div>`;
     }
@@ -47,16 +58,16 @@ export function mountHistory(root, ctx) {
   }
 
   function html() {
-    if (!ctx.expenses.length) {
+    if (!ctx.expenses.length && !ctx.tripExpenses.length) {
       return header('История') + `<div class="pad">${installNotice(false)}<div class="heroc"><svg width="96" height="96" viewBox="0 0 96 96" fill="none" aria-hidden="true"><circle cx="48" cy="48" r="38" fill="#fff" fill-opacity=".55" stroke="#111" stroke-width="2"/><circle cx="48" cy="48" r="22" fill="#E8499A"/><path d="M48 38v20M38 48h20" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg><h2>Расходов пока нет</h2><p>Первая запись займёт несколько секунд: сумма, категория, готово.</p><button type="button" class="btn primary big" data-act="add">Добавить первый расход</button></div></div>`;
     }
     const f = state.filters, active = filtersActive(f), tripMonth = tripMonthTotals(ctx.trips, ctx.tripExpenses)[state.month] ?? 0;
-    const monthSum = selectMonth(ctx.expenses, state.month).reduce((s, e) => s + e.amount, 0);
+    const plainSum = selectMonth(ctx.expenses, state.month).reduce((s, e) => s + e.amount, 0), monthSum = plainSum + tripMonth;
     const shown = active ? selectMonth(ctx.expenses, state.month, f).reduce((s, e) => s + e.amount, 0) : null;
     const filterBtn = `<button type="button" class="ib${active ? ' on' : ''}" data-act="opensheet" aria-label="Фильтры">${UI.filter}</button>`;
-    return header('История', filterBtn) + monthStripHTML(monthStripKeys(ctx.expenses, state.today), state.month) + '<div class="pad">' +
+    return header('История', filterBtn) + monthStripHTML(monthStripKeys([...ctx.expenses, ...ctx.tripExpenses], state.today, 12), state.month) + '<div class="pad">' +
       (banner ? '<div class="banner"><span style="flex:1">Пора сделать экспорт за месяц</span><button type="button" class="btn" style="padding:8px 16px" data-act="export">Экспорт</button><button type="button" class="ibtn" data-act="bannerx" aria-label="Скрыть напоминание">✕</button></div>' : '') +
-      `<div class="card"><div class="small muted">Всего за ${esc(monthName(state.month).toLowerCase())}</div><div class="total num">${formatRub(monthSum)}</div>${active ? `<div class="small muted" style="margin-top:4px">По фильтрам: <b class="num">${formatRub(shown)}</b></div>` : ''}${tripMonth ? `<div class="small muted" style="margin-top:4px">Поездки в этом месяце: <b class="num">${formatRub(tripMonth)}</b> (на вкладке «Поездки»)</div>` : ''}</div>` +
+      `<div class="card"><div class="small muted">Всего за ${esc(monthName(state.month).toLowerCase())}</div><div class="total num">${formatRub(monthSum)}</div>${active ? `<div class="small muted" style="margin-top:4px">По фильтрам: <b class="num">${formatRub(shown)}</b></div>` : ''}${tripMonth ? `<div class="small muted" style="margin-top:4px">из них поездки: <b class="num">${formatRub(tripMonth)}</b></div>` : ""}</div>` +
       `<div id="hlist">${listHTML()}</div></div>` + (sheet ? filterSheet() : '');
   }
 

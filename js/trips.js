@@ -6,7 +6,7 @@ import { isValidDate, monthKey, daysBetween, dayShort } from './dates.js';
 
 export const RATE_SCALE = 10000;
 export const MAX_RATE_E4 = 10000 * RATE_SCALE; // 10 000 ₽ за единицу валюты — с запасом для любой реальной валюты
-export const CURRENCIES = [['TRY', 'турецкая лира'], ['EUR', 'евро'], ['USD', 'доллар США'], ['GEL', 'грузинский лари'], ['AED', 'дирхам ОАЭ'], ['RUB', 'российский рубль']];
+export const CURRENCIES = [['RUB', 'российский рубль'], ['TRY', 'турецкая лира'], ['EUR', 'евро'], ['USD', 'доллар США'], ['GEL', 'грузинский лари'], ['AED', 'дирхам ОАЭ']];
 
 export const RATE_ERRORS = {
   format: 'Курс введён в неверном формате. Введите число, например 2,35 или 2,3500.',

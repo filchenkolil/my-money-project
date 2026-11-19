@@ -92,9 +92,9 @@ export const weekStart = (iso) => weekOf(iso)[0];
  * расширенные до целых недель (чтобы полоса листалась неделями без обрезанных краёв).
  * Если выбранная дата за пределами (правка старой записи), полоса дотягивается до неё.
  */
-export function stripRange(today, selected = today, months = 2) {
+export function stripRange(today, selected = today, months = 2, ahead = 12) {
   const lo = [shiftMonthsISO(today, -months), selected].sort()[0];
-  const hi = [shiftMonthsISO(today, months), selected].sort().reverse()[0];
+  const hi = [shiftMonthsISO(today, ahead), selected].sort().reverse()[0];
   return { start: weekStart(lo), end: weekOf(hi)[6] };
 }
 

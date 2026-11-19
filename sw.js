@@ -1,6 +1,6 @@
 /* Служебный скрипт: приложение открывается без интернета, новая версия ставится только после нажатия «Обновить».
    Список файлов и номер версии между маркерами обновляет tools/sw-sync.sh (запускать перед каждой публикацией). */
-/* VERSION-START */ const VERSION = '2.1.0'; /* VERSION-END */
+/* VERSION-START */ const VERSION = '2.1.1'; /* VERSION-END */
 const CACHE = 'mymoney-' + VERSION;
 const FILES = [
   /* FILES-START */

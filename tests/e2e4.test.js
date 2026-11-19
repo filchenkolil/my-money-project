@@ -35,13 +35,13 @@ const iso = (d) => d.toLocaleDateString('sv');
 const today = () => iso(new Date());
 const monthsAgo = (n) => { const d = new Date(); d.setMonth(d.getMonth() + n); return iso(d); };
 
-test('календарь: полоса на 2 месяца назад и вперёд, открыта текущая неделя, выбор будущей и прошлой даты', async () => {
+test('календарь: полоса на 2 месяца назад и 12 вперёд, открыта текущая неделя, выбор будущей и прошлой даты', async () => {
   const a = await openApp();
   try {
     const vs = a.qa('.wk button').map((b) => b.dataset.v);
-    eq(vs.length % 7, 0); ok(vs.length >= 17 * 7, 'полоса на ±2 месяца');
-    ok(vs.includes(monthsAgo(-2)) && vs.includes(monthsAgo(2)), 'краевые даты есть');
-    ok(vs[0] > monthsAgo(-3) && vs[vs.length - 1] < monthsAgo(3), 'дальше диапазона дат нет');
+    eq(vs.length % 7, 0); ok(vs.length >= 17 * 7, 'полоса не короче 2 месяцев');
+    ok(vs.includes(monthsAgo(-2)) && vs.includes(monthsAgo(12)), 'краевые даты есть: 2 месяца назад и 12 вперёд');
+    ok(vs[0] > monthsAgo(-3) && vs[vs.length - 1] < monthsAgo(13), 'дальше диапазона дат нет');
     const strip = a.q('#wk');
     ok(strip.scrollLeft > 0, 'открыта текущая неделя, а не начало полосы');
     const sr = strip.getBoundingClientRect(), tr = a.q('[data-today]').getBoundingClientRect();

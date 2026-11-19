@@ -27,6 +27,7 @@ test('вкладка «Поездки»: пустое состояние, соз
     ok(a.q('.heroc').textContent.includes('Поездок пока нет'));
     eq(a.q('.tabs [aria-current="page"]').textContent.trim(), 'Поездки');
     a.click(a.q('.heroc [data-act="new"]')); await waitFor(() => a.h1() === 'Новая поездка', 'форма');
+    eq(a.q('#tcur').value, 'RUB', 'по умолчанию рубль'); a.change(a.q('#tcur'), 'TRY'); await sleep(40);
     ok(a.q('.notice').textContent.includes('нельзя изменить'), 'предупреждение о датах');
     a.click(a.q('[data-act="save"]')); await waitFor(() => a.q('.err'), 'ошибка названия'); ok(a.q('.err').textContent.includes('название'));
     a.input(a.q('#tname'), 'Стамбул'); setDate(a, a.q('#tstart'), '2027-02-16'); setDate(a, a.q('#tend'), '2027-02-12');
@@ -45,8 +46,8 @@ test('валюта: рубль не требует курса, другая ва
   const a = await openApp({ route: '#/tripedit/new' });
   try {
     await waitFor(() => a.q('#tcur'), 'форма');
-    ok(a.q('#trate'), 'для лиры курс нужен');
-    a.change(a.q('#tcur'), 'RUB'); await sleep(40); ok(!a.q('#trate'), 'для рубля курса нет');
+eq(a.qa('#tcur option')[0].value, 'RUB', 'рубль первым в списке'); eq(a.q('#tcur').value, 'RUB'); ok(!a.q('#trate'), 'для рубля курса нет');    a.change(a.q('#tcur'), 'TRY'); await sleep(40); ok(a.q('#trate'), 'для лиры курс нужен');
+    a.change(a.q('#tcur'), 'RUB'); await sleep(40); ok(!a.q('#trate'), 'снова рубль: курса нет');
     a.change(a.q('#tcur'), 'OTHER'); await sleep(40); ok(a.q('#tother'), 'поле для кода');
     a.input(a.q('#tname'), 'Швейцария'); setDate(a, a.q('#tstart'), '2027-03-01'); setDate(a, a.q('#tend'), '2027-03-05');
     a.input(a.q('#tother'), 'ch'); a.click(a.q('[data-act="save"]')); await waitFor(() => a.q('.err'), 'код'); ok(a.q('.err').textContent.includes('три латинские'));
@@ -200,18 +201,45 @@ test('аналитика: поездка отдельным сегментом �
     a.click(a.qa('.legrow').find((r) => r.textContent.includes('Турция'))); await waitFor(() => a.h1() === 'Турция', 'экран поездки');
     await a.go('#/analytics/compare', () => a.q('.mcol'));
     // дашборд «Поездки»
-    a.click(a.qa('.dchip')[5]); await waitFor(() => a.q('.tripcard'), 'дашборд');
-    ok(a.q('.tripcard').textContent.includes('Турция') && a.q('.tripcard .stack') && a.q('.tripcard').textContent.includes('в день'));
-    a.click(a.q('.tripcard')); await waitFor(() => a.h1() === 'Турция', 'переход');
+    a.click(a.qa('.dchip')[5]); await waitFor(() => a.q('#tfilter'), 'дашборд');
+    const flat = (el) => el.textContent.replace(/\s/g, '');
+    ok(flat(a.q('.hero .big')).includes(formatRub(RUB_TOTAL()).replace(/\s/g, '').replace('₽', '')), a.q('.hero .big').textContent);
+    ok(a.q('svg.donut'), 'круговая диаграмма по категориям'); eq(a.qa('.legrow').filter((r) => r.querySelector('.pc')).length, 3, 'три категории поездки');
+    eq(a.qa('#tfilter option').length, 2, 'все поездки и одна поездка');
+    a.click(a.qa('[data-k="chart"]')[1]); await sleep(60); ok(!a.q('svg.donut') && a.q('.legrow .bar'), 'столбцы вместо круга');
+    ok(a.qa('.stat').length >= 3, 'итоги: в день, средний расход, расходов');
+    a.change(a.q('#tfilter'), (await firstTrip()).id); await sleep(60);
+    eq(a.qa('[data-k="by"]')[1].textContent, 'По дням');
+    a.click(a.qa('[data-k="by"]')[1]); await sleep(60);
+    ok(a.qa('.mscroll .mcol').length >= 5, 'столбец на каждый день поездки и дни до начала');
+    a.change(a.q('#tfilter'), 'all'); await sleep(60);
+    ok(a.q('#tfilter').value === 'all');
+    a.click(a.qa('[data-act="trip"]')[0]); await waitFor(() => a.h1() === 'Турция', 'переход');
   } finally { a.close(); }
 });
 
-test('история: расходы поездок не попадают в список, но месяц показывает строку про поездки', async () => {
+test('история: расходы поездок видны в списке месяца и входят в итог', async () => {
   const a = await openApp({ seed: async (s) => { await seedTrip(s); await s.addExpense({ amount: 100000, date: shift(0), categoryId: 'prod' }); }, route: '#/history' });
   try {
     await waitFor(() => a.q('.rec'), 'список');
-    eq(a.qa('.rec').length, 1);
-    ok(a.q('.card').textContent.includes('Поездки в этом месяце'), a.q('.card').textContent);
+    const rows = a.qa('.rec'); ok(rows.length >= 3, 'обычный расход и расходы поездки в этом месяце: ' + rows.length);
+    ok(a.qa('.rec .badge.trip').length >= 2 && a.q('.rec .badge.trip').textContent === 'поездка');
+    ok(a.qa('.rec').some((r) => r.textContent.includes('Турция')), 'название поездки в строке');
+    ok(a.q('.card').textContent.includes('из них поездки'), a.q('.card').textContent);
+    a.click(a.qa('.rec').find((r) => r.querySelector('.badge.trip'))); await waitFor(() => a.h1() === 'Редактирование', 'правка расхода поездки');
+  } finally { a.close(); }
+});
+
+test('история: билеты, купленные заранее, видны в месяце покупки; фильтр скрывает поездки; будущие месяцы в ленте', async () => {
+  const a = await openApp({ seed: async (s) => { const t = await s.addTrip({ name: 'Январь', start: shift(60), end: shift(65), currency: 'RUB', rate: '' }); await s.addTripExpense({ tripId: t.id, categoryId: 'tc.tkt', amount: 3500000, isRub: true, date: shift(0), note: 'билеты в январь' }); }, route: '#/history' });
+  try {
+    await waitFor(() => a.q('.rec'), 'список');
+    eq(a.qa('.rec').length, 1); ok(a.q('.rec').textContent.includes('билеты в январь') && a.q('.rec').textContent.includes('Январь'));
+    ok(a.q('.total').textContent.includes('35 000'), 'итог месяца включает билеты: ' + a.q('.total').textContent);
+    ok(a.qa('.mchip').length >= 13, 'лента месяцев тянется на 12 месяцев вперёд: ' + a.qa('.mchip').length);
+    a.click(a.q('[data-act="opensheet"]')); await waitFor(() => a.q('#fcat'), 'фильтры');
+    a.click(a.q('[data-act="fltreg"]')); await sleep(60);
+    ok(!a.q('.rec'), 'при фильтре расходов поездок нет');
   } finally { a.close(); }
 });
 
@@ -318,5 +346,19 @@ test('экраны поездок: нет горизонтальной прок�
       }
     }
     eq([...bad], []); eq([...tapBad], []); eq([...nameBad], []); eq(lightBad, []);
+  } finally { a.close(); }
+});
+
+test('форма поездки: «Конец» сразу переходит на дату начала и не раньше неё', async () => {
+  const a = await openApp({ route: '#/tripedit/new' });
+  try {
+    await waitFor(() => a.q('#tstart'), 'форма');
+    ok(!a.q('#tend').value, 'пока пусто');
+    setDate(a, a.q('#tstart'), '2027-01-03'); await sleep(40);
+    eq(a.q('#tend').value, '2027-01-03', 'календарь «По» откроется на январе 2027'); eq(a.q('#tend').min, '2027-01-03');
+    setDate(a, a.q('#tend'), '2027-01-10'); setDate(a, a.q('#tstart'), '2027-01-05'); await sleep(40);
+    eq(a.q('#tend').value, '2027-01-10', 'выбранный конец не сбрасывается, если он позже начала');
+    setDate(a, a.q('#tstart'), '2027-02-01'); await sleep(40);
+    eq(a.q('#tend').value, '2027-02-01', 'конец раньше нового начала подтягивается к нему');
   } finally { a.close(); }
 });
