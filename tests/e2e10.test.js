@@ -362,3 +362,20 @@ test('форма поездки: «Конец» сразу переходит н
     eq(a.q('#tend').value, '2027-02-01', 'конец раньше нового начала подтягивается к нему');
   } finally { a.close(); }
 });
+
+test('расход поездки: валюта выбирается сама (билеты в рублях, остальное в валюте), её можно переключить', async () => {
+  const a = await openApp({ seed: async (s) => { await seedTrip(s); }, route: '#/add' });
+  try {
+    await waitFor(() => a.q('.seg'), 'форма');
+    a.click(a.qa('.seg button')[1]); await waitFor(() => a.q('#tripsel'), 'режим поездки');
+    const pressed = () => a.q('[data-act="cur"][aria-pressed="true"]').dataset.v;
+    eq(pressed(), 'local', 'сначала валюта поездки');
+    a.click(a.q('[data-act="tcat"][data-id="tc.tkt"]')); await sleep(60);
+    eq(pressed(), 'rub', 'билеты: рубли (в этой поездке билеты записаны в рублях)');
+    a.click(a.q('[data-act="tcat"][data-id="tc.res"]')); await sleep(60);
+    eq(pressed(), 'local', 'в этой поездке рестораны в лирах');
+    a.click(a.q('[data-act="cur"][data-v="rub"]')); await sleep(60);
+    a.click(a.q('[data-act="tcat"][data-id="tc.sty"]')); await sleep(60);
+    eq(pressed(), 'rub', 'ручной выбор не сбрасывается сменой категории');
+  } finally { a.close(); }
+});

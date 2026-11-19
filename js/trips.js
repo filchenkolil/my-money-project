@@ -183,3 +183,16 @@ export function diffTripExpense(old, next, n) {
   if (old.date !== next.date) out.push({ label: 'Дата', from: dayShort(old.date), to: dayShort(next.date) });
   return out;
 }
+
+/**
+ * Какую валюту предложить для нового расхода поездки (true = рубли, false = валюта поездки).
+ * 1) как в последнем расходе этой же категории в этой поездке; 2) для билетов («tc.tkt») рубли; 3) иначе валюта поездки.
+ * У рублёвой поездки валюта одна, всегда false. Пользователь может переключить вручную.
+ */
+export function suggestRub(trip, tripExpenses, categoryId) {
+  if (!trip || trip.currency === 'RUB') return false;
+  const same = tripExpenses.filter((e) => e.tripId === trip.id && e.categoryId === categoryId)
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.createdAt ?? 0) - (a.createdAt ?? 0)));
+  if (same.length) return !!same[0].isRub;
+  return categoryId === 'tc.tkt';
+}

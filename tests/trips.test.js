@@ -334,3 +334,16 @@ test('«Месяц к месяцу» с поездками: строка «По�
   eq(d.map((x) => x.trip.name), ['Москва', 'Турция']); eq([d[1].count, d[0].totalRub], [4, 100000]);
   eq(categoryView(reg, ['2026-11', '2026-12'], '2026-12', { categoryId: 'prod' }, { trips, tripExpenses: exps }).shares[1], Math.round(100000 / (100000 + row.cur) * 1000) / 10, 'доля категории считается от итога с поездками');
 });
+
+test('автовыбор валюты расхода поездки: по прошлым расходам категории, билеты в рублях, иначе валюта поездки', () => {
+  const trip = { id: 't', currency: 'GEL', rateE4: 280000 }, rubTrip = { id: 'r', currency: 'RUB', rateE4: 10000 };
+  const ex = (id, categoryId, isRub, date, createdAt = 1) => ({ id, tripId: 't', categoryId, isRub, date, createdAt });
+  const list = [ex('1', 'tc.res', false, '2026-05-02'), ex('2', 'tc.res', true, '2026-05-03'), ex('3', 'tc.res', false, '2026-05-03', 5), ex('4', 'tc.trn', true, '2026-05-01')];
+  eq(T.suggestRub(trip, list, 'tc.res'), false, 'последний расход категории в лари');
+  eq(T.suggestRub(trip, list, 'tc.trn'), true, 'в этой категории была оплата в рублях');
+  eq(T.suggestRub(trip, [], 'tc.tkt'), true, 'билеты по умолчанию в рублях');
+  eq(T.suggestRub(trip, [], 'tc.fod'), false, 'без истории валюта поездки');
+  eq(T.suggestRub(trip, [ex('9', 'tc.tkt', false, '2026-05-01')], 'tc.tkt'), false, 'история важнее правила про билеты');
+  eq(T.suggestRub(rubTrip, [], 'tc.tkt'), false, 'у рублёвой поездки валюта одна');
+  eq(T.suggestRub(null, list, 'tc.res'), false);
+});

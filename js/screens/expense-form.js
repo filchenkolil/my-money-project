@@ -5,7 +5,7 @@ import { formatInput, formatRub, toInputString } from '../money.js';
 import { dayShort, monthKey, shiftMonthsISO, rangeLabel } from '../dates.js';
 import { dayTotal, frequentCategories } from '../stats.js';
 import { newForm, afterSave, checkForm, tileList, expenseWord, expenseToForm, diffExpense } from '../form.js';
-import { checkTripForm, conversionText, defaultTripId, diffTripExpense, expenseRub } from '../trips.js';
+import { checkTripForm, conversionText, defaultTripId, diffTripExpense, expenseRub, suggestRub } from '../trips.js';
 import { StoreError } from '../store.js';
 import { icon, UI } from '../ui/icons.js';
 import { esc, dotHTML, header, scrollToEl, installNotice, sheetHTML } from '../ui/dom.js';
@@ -272,8 +272,8 @@ export function mountExpenseForm(root, ctx, { expense = null, kind = 'regular' }
         f.categoryId = v.id; f.subcategoryId = null; f.error = null; addSub = false; render();
         // Вниз к подкатегориям (или к «Комментарию», если подкатегорий нет). Наверх и в поле суммы не возвращаем.
         scrollToEl(root, ctx.categories.some((c) => c.parentId === v.id) ? '#subs' : '#extras'); break;
-      case 'tcat': tf.categoryId = v.id; f.error = null; render(); scrollToEl(root, '#extras'); break;
-      case 'cur': tf.rub = v.v === 'rub'; render(); break;
+      case 'tcat': tf.categoryId = v.id; f.error = null; if (!tf.curTouched && !origTrip) tf.rub = suggestRub(trip(), ctx.tripExpenses, v.id); render(); scrollToEl(root, '#extras'); break;
+      case 'cur': tf.rub = v.v === 'rub'; tf.curTouched = true; render(); break;
       case 'sub': f.subcategoryId = f.subcategoryId === v.id ? null : v.id; render(); scrollToEl(root, '#extras'); break;
       case 'addsub': addSub = true; newSub = ''; render(); root.querySelector('#newsub')?.focus(); break;
       case 'addsubno': addSub = false; render(); break;
@@ -295,7 +295,7 @@ export function mountExpenseForm(root, ctx, { expense = null, kind = 'regular' }
   root.onchange = (ev) => {
     const t = ev.target;
     if (t.id === 'date' && t.value) { f.date = t.value; if (mode === 'trip' && !edit) tf.tripId = defaultTripId(ctx.trips, f.date, tf.tripId); render(); }
-    else if (t.id === 'tripsel') { tf.tripId = t.value; if (trip()?.currency === 'RUB') tf.rub = false; render(); }
+    else if (t.id === 'tripsel') { tf.tripId = t.value; if (trip()?.currency === 'RUB') tf.rub = false; else if (!tf.curTouched && !origTrip) tf.rub = suggestRub(trip(), ctx.tripExpenses, tf.categoryId); render(); }
   };
   root.onkeydown = (ev) => {
     if (ev.key !== 'Enter') return;
