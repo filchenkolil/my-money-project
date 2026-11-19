@@ -72,3 +72,46 @@ test('частые категории: по числу расходов за 60 
   eq(S.frequentCategories([], ids, '2026-11-05'), ['prod', 'trans', 'pet', 'gifts', 'rest']);                // нет истории: порядок по умолчанию
   eq(S.frequentCategories([e('2026-11-07', 1, 'rest')], ids, '2026-11-05'), ['prod', 'trans', 'pet', 'gifts', 'rest']); // расходы «из будущего» не считаются
 });
+
+test('поиск категории по тексту: название, подкатегория, начало слова, неоднозначность', async () => {
+  const { findCategoryChoice, categoryChoices } = await import('../js/categories.js');
+  const cats = [{ id: 'a', name: 'Питомец', parentId: null, order: 0 }, { id: 'a1', name: 'Корм', parentId: 'a', order: 0 }, { id: 'b', name: 'Продукты', parentId: null, order: 1 }, { id: 'c', name: 'Подарки', parentId: null, order: 2 }, { id: 'c1', name: 'Корм для души', parentId: 'c', order: 0 }];
+  eq(categoryChoices(cats).map((c) => c.label), ['Питомец', 'Питомец › Корм', 'Продукты', 'Подарки', 'Подарки › Корм для души']);
+  eq(findCategoryChoice(cats, 'питомец'), 'c:a'); eq(findCategoryChoice(cats, ' ПРОДУКТЫ '), 'c:b');
+  eq(findCategoryChoice(cats, 'Питомец › Корм'), 's:a:a1'); eq(findCategoryChoice(cats, 'питомец > корм'), 's:a:a1');
+  eq(findCategoryChoice(cats, 'прод'), 'c:b', 'единственное совпадение по началу'); eq(findCategoryChoice(cats, 'души'), 's:c:c1', 'совпадение внутри названия');
+  eq(findCategoryChoice(cats, 'п'), null, 'несколько вариантов: не угадываем');
+  eq(findCategoryChoice(cats, 'корм'), 's:a:a1', 'точное название подкатегории важнее частичного');
+  eq(findCategoryChoice(cats, 'нет'), null); eq(findCategoryChoice(cats, ''), null);
+});
+
+test('история с поездками: строки в рублях, фильтр скрывает поездки, лента вперёд на 12 месяцев', async () => {
+  const { selectMonthWithTrips, monthStripKeys, NO_FILTERS } = await import('../js/history.js');
+  const trips = [{ id: 't', name: 'Турция', start: '2027-01-10', end: '2027-01-15', currency: 'TRY', rateE4: 23500 }];
+  const tripExpenses = [{ id: 'x1', tripId: 't', date: '2026-11-18', amount: 100000, isRub: true, categoryId: 'tc.tkt', createdAt: 5 }, { id: 'x2', tripId: 't', date: '2027-01-11', amount: 10000, isRub: false, categoryId: 'tc.fod', createdAt: 6 }];
+  const exp = [{ id: 'e1', date: '2026-11-18', amount: 5000, categoryId: 'prod', subcategoryId: null, isRegular: false, createdAt: 9 }];
+  const nov = selectMonthWithTrips(exp, { trips, tripExpenses }, '2026-11');
+  eq(nov.map((e) => e.id), ['e1', 'x1']); eq(nov[1].amount, 100000); eq(nov[1].trip.name, 'Турция');
+  eq(selectMonthWithTrips(exp, { trips, tripExpenses }, '2027-01').map((e) => e.amount), [23500], '100 TRY по курсу 2,35');
+  eq(selectMonthWithTrips(exp, { trips, tripExpenses }, '2026-11', { ...NO_FILTERS, regularOnly: true }), []);
+  eq(selectMonthWithTrips(exp, { trips, tripExpenses }, '2026-11', { ...NO_FILTERS, categoryId: 'prod' }).map((e) => e.id), ['e1']);
+  const ks = monthStripKeys([], '2026-11-19', 12); eq([ks[0], ks.at(-1), ks.length], ['2026-11', '2027-11', 13]);
+  eq(monthStripKeys([], '2026-11-19').length, 1, 'без ahead лента как раньше');
+});
+
+test('аналитика поездок: по категориям, по дням одной поездки, по поездкам', async () => {
+  const { tripsAnalysis } = await import('../js/analytics.js');
+  const trips = [{ id: 't', name: 'Турция', start: '2027-01-10', end: '2027-01-12', currency: 'TRY', rateE4: 20000 }, { id: 'm', name: 'Москва', start: '2027-02-01', end: '2027-02-02', currency: 'RUB', rateE4: 10000 }];
+  const tripExpenses = [
+    { id: '1', tripId: 't', date: '2026-11-18', amount: 3000000, isRub: true, categoryId: 'tc.tkt' }, { id: '2', tripId: 't', date: '2027-01-10', amount: 10000, isRub: false, categoryId: 'tc.fod' },
+    { id: '3', tripId: 't', date: '2027-01-11', amount: 5000, isRub: false, categoryId: 'tc.fod' }, { id: '4', tripId: 'm', date: '2027-02-01', amount: 200000, isRub: false, categoryId: 'tc.trn' }];
+  const all = tripsAnalysis({ trips, tripExpenses });
+  eq([all.total, all.count, all.days, all.before], [3000000 + 20000 + 10000 + 200000, 4, 5, 3000000]);
+  eq(all.items.map((i) => i.id), ['tc.tkt', 'tc.trn', 'tc.fod']); eq(all.items[0].share, Math.round((3000000 / 3230000) * 1000) / 10);
+  eq(all.perDay, Math.round(3230000 / 5)); eq(all.avg, Math.round(3230000 / 4));
+  const one = tripsAnalysis({ trips, tripExpenses }, { tripId: 't', by: 'time' });
+  eq(one.single, true); eq(one.items.map((i) => i.id), ['2026-11-18', '2027-01-10', '2027-01-11', '2027-01-12']); eq(one.items.map((i) => i.amount), [3000000, 20000, 10000, 0]);
+  const byTrip = tripsAnalysis({ trips, tripExpenses }, { by: 'time' });
+  eq(byTrip.items.map((i) => [i.label, i.amount]), [['Турция', 3030000], ['Москва', 200000]]);
+  eq(tripsAnalysis({ trips, tripExpenses: [] }).total, 0);
+});

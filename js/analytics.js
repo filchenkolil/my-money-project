@@ -1,6 +1,6 @@
 /* Данные для дашбордов аналитики. Чистые функции над списком расходов: страницы здесь нет, поэтому всё проверяется тестами.
    Поездки (v2) подмешиваются через tripData = { trips, tripExpenses }: месяц считает расходы поездки строго по их датам. */
-import { addMonths, monthProgress } from './dates.js';
+import { addMonths, monthProgress, daysBetween } from './dates.js';
 import { monthTotal, categoryTotals, subTotals, delta, share, series, summary, topChanges } from './stats.js';
 import { monthTripSegments, tripMonthTotals, tripSummary, expenseRub } from './trips.js';
 
@@ -96,4 +96,31 @@ export function paceView(expenses, key, today, tripData = NO_TRIPS) {
 /** Дашборд «Поездки»: сводка по каждой поездке (стоимость, в день, структура по категориям), свежие сверху. */
 export function tripsDashboard(tripData) {
   return [...tripData.trips].sort((a, b) => (a.start < b.start ? 1 : -1)).map((trip) => ({ trip, ...tripSummary(trip, tripData.tripExpenses) }));
+}
+
+/**
+ * Дашборд «Поездки» с фильтрами. tripId — одна поездка или 'all'; by — 'cat' (по категориям поездки) или 'time'
+ * (для одной поездки по дням, для всех по поездкам). Суммы в рублях, расходы до начала поездки входят.
+ * items: [{ id, label?, amount, share }], для 'time' по порядку дат или начала поездок.
+ */
+export function tripsAnalysis(tripData, { tripId = 'all', by = 'cat' } = {}) {
+  const trips = tripData.trips.filter((t) => tripId === 'all' || t.id === tripId).sort((a, b) => (a.start < b.start ? -1 : 1));
+  const ids = new Set(trips.map((t) => t.id)), byId = new Map(trips.map((t) => [t.id, t]));
+  const exps = tripData.tripExpenses.filter((e) => ids.has(e.tripId)).map((e) => ({ ...e, rub: expenseRub(e, byId.get(e.tripId)) }));
+  const total = exps.reduce((s, e) => s + e.rub, 0), count = exps.length;
+  const days = trips.reduce((s, t) => s + daysBetween(t.start, t.end).length, 0);
+  const before = exps.filter((e) => e.date < byId.get(e.tripId).start).reduce((s, e) => s + e.rub, 0);
+  const group = (keyOf) => { const m = new Map(); for (const e of exps) m.set(keyOf(e), (m.get(keyOf(e)) ?? 0) + e.rub); return m; };
+  let items;
+  if (by === 'time' && trips.length === 1) {
+    const t = trips[0], m = group((e) => e.date), dates = [...new Set([...daysBetween(t.start, t.end), ...m.keys()])].sort();
+    items = dates.map((d) => ({ id: d, amount: m.get(d) ?? 0 }));
+  } else if (by === 'time') {
+    const m = group((e) => e.tripId);
+    items = trips.map((t) => ({ id: t.id, label: t.name, amount: m.get(t.id) ?? 0 }));
+  } else {
+    items = [...group((e) => e.categoryId)].map(([id, amount]) => ({ id, amount })).sort((a, b) => b.amount - a.amount);
+  }
+  items = items.map((i) => ({ ...i, share: share(i.amount, total) }));
+  return { trips, total, count, days, before, perDay: days ? Math.round(total / days) : 0, avg: count ? Math.round(total / count) : 0, items, single: trips.length === 1 };
 }

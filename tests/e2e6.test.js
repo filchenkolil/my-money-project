@@ -95,7 +95,7 @@ test('категория во времени: выбор из списка, ср
     ok(stats[0].includes('2 000'), 'среднее по двум месяцам: 2 000 ₽');
     a.change(a.q('#dcat'), 's:pet:pet.1'); await sleep(80);
     ok(a.q('.hero').textContent.includes('Питомец › Корм') && a.q('.hero').textContent.includes('1 500'));
-    a.click(a.qa('.chip').find((c) => c.textContent === 'Продукты')); await sleep(60);
+ok(!a.q('.chip'), 'быстрых кнопок категорий нет, остались список и ручной ввод');    ok(a.q('#dtext') && a.q('#dnames option'), 'есть поле ручного ввода со списком подсказок');    a.input(a.q('#dtext'), 'продук'); a.change(a.q('#dtext'), 'продук'); await sleep(80);    eq(a.q('#dcat').value, 'c:prod', 'категория найдена по началу названия');    a.input(a.q('#dtext'), 'Питомец › Корм'); await sleep(80);    eq(a.q('#dcat').value, 's:pet:pet.1', 'подкатегория найдена по полному названию из подсказки');    a.input(a.q('#dtext'), 'нет такой'); a.change(a.q('#dtext'), 'нет такой'); await sleep(60);    ok(!a.q('#dtexterr').hidden, 'для неизвестного названия показана подсказка'); eq(a.q('#dcat').value, 's:pet:pet.1', 'выбор не изменился');    a.change(a.q('#dcat'), 'c:prod'); await sleep(60);
     eq(a.q('#dcat').value, 'c:prod');
     a.change(a.q('#dcat'), 'c:inv'); await sleep(60);
     ok(a.q('.empty').textContent.includes('расходов пока нет'));
