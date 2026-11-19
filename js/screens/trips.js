@@ -13,7 +13,7 @@ import { hashFor } from '../router.js';
 const fail = (e) => (e instanceof StoreError ? e.message : 'Не удалось сохранить. Данные не изменились, попробуйте ещё раз.');
 const tcat = (ctx, id) => ctx.tripCategories.find((c) => c.id === id);
 const colorOf = (ctx, id) => hueColor(tcat(ctx, id)?.hue ?? 200);
-export const tripDot = (c, size = 40) => `<span class="dot" style="background:${hueColor(c?.hue ?? 200)};width:${size}px;height:${size}px">${icon(c?.icon ?? 'tag')}</span>`;
+export const tripDot = (c, size = 40) => `<span class="dot" style="--h:${c?.hue ?? 200};width:${size}px;height:${size}px">${icon(c?.icon ?? 'tag')}</span>`;
 
 /** Сумма расхода поездки для списков: в валюте (если не рубли) и рядом рубли. */
 export function tripAmountHTML(e, trip) {
@@ -89,8 +89,8 @@ export function mountTrip(root, ctx, id) {
 export function mountTripEdit(root, ctx, id) {
   let disposed = false, saving = false, review = null, error = '', errField = '';
   const isNew = id === 'new', old = isNew ? null : ctx.trips.find((x) => x.id === id);
-  const known = CURRENCIES.some((c) => c[0] === (old?.currency ?? 'TRY'));
-  let f = isNew ? { name: '', start: '', end: '', cur: 'TRY', other: '', rate: '' } : { name: old.name, start: old.start, end: old.end, cur: known ? old.currency : 'OTHER', other: known ? '' : old.currency, rate: formatRateFull(old.rateE4) };
+  const known = CURRENCIES.some((c) => c[0] === (old?.currency ?? 'RUB'));
+  let f = isNew ? { name: '', start: '', end: '', cur: 'RUB', other: '', rate: '' } : { name: old.name, start: old.start, end: old.end, cur: known ? old.currency : 'OTHER', other: known ? '' : old.currency, rate: formatRateFull(old.rateE4) };
   const currency = () => (f.cur === 'OTHER' ? f.other.trim().toUpperCase() : f.cur);
 
   function previewHTML() {
@@ -104,7 +104,7 @@ export function mountTripEdit(root, ctx, id) {
     const err = (field) => (errField === field && error ? `<div class="err" role="alert">${esc(error)}</div>` : '');
     let h = header(isNew ? 'Новая поездка' : old.name, '', true) + '<div class="pad">';
     h += `<div class="lbl" style="margin-top:4px">Название</div><input class="inp" id="tname" maxlength="30" placeholder="Например, Стамбул" aria-label="Название" value="${esc(f.name)}">${err('name')}`;
-    h += `<div class="grid2"><div><div class="lbl">Начало</div><input class="inp" type="date" id="tstart" aria-label="Начало поездки" value="${esc(f.start)}"${isNew ? '' : ' disabled'}></div><div><div class="lbl">Конец</div><input class="inp" type="date" id="tend" aria-label="Окончание поездки" value="${esc(f.end)}"${isNew ? '' : ' disabled'}></div></div>${err('dates')}`;
+    h += `<div class="grid2"><div><div class="lbl">Начало</div><input class="inp" type="date" id="tstart" aria-label="Начало поездки" value="${esc(f.start)}"${isNew ? '' : ' disabled'}></div><div><div class="lbl">Конец</div><input class="inp" type="date" id="tend" aria-label="Окончание поездки" value="${esc(f.end)}"${f.start ? ` min="${esc(f.start)}"` : ''}${isNew ? '' : ' disabled'}></div></div>${err('dates')}`;
     h += isNew ? '<div class="notice" style="margin-top:12px">Даты нельзя изменить после создания. Проверьте их.</div>' : '<div class="small muted" style="margin-top:8px">Даты после создания менять нельзя.</div>';
     h += `<div class="lbl">Валюта</div><select class="inp" id="tcur" aria-label="Валюта">${CURRENCIES.map(([c, n]) => `<option value="${c}"${f.cur === c ? ' selected' : ''}>${c} — ${n}</option>`).join('')}<option value="OTHER"${f.cur === 'OTHER' ? ' selected' : ''}>Другая (код ISO)…</option></select>`;
     if (f.cur === 'OTHER') h += `<input class="inp" id="tother" maxlength="3" style="margin-top:8px" placeholder="Три буквы, например CHF" aria-label="Код валюты" value="${esc(f.other)}">`;
@@ -159,7 +159,11 @@ export function mountTripEdit(root, ctx, id) {
   };
   root.onchange = (ev) => {
     const t = ev.target;
-    if (t.id === 'tstart') f.start = t.value; else if (t.id === 'tend') f.end = t.value;
+    if (t.id === 'tstart') {
+      f.start = t.value; // «По» сразу переходит на месяц и день начала: календарь откроется там, а не в сегодняшнем месяце
+      if (f.start && (!f.end || f.end < f.start)) f.end = f.start;
+      const end = root.querySelector('#tend'); if (end) { end.min = f.start; end.value = f.end; }
+    } else if (t.id === 'tend') f.end = t.value;
     else if (t.id === 'tcur') { f.cur = t.value; render(); }
   };
   render();

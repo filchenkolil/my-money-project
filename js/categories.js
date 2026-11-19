@@ -66,3 +66,20 @@ export function diffCategory(old, next) {
 export const expensesIn = (expenses, category) => (category.parentId === null
   ? expenses.filter((e) => e.categoryId === category.id)
   : expenses.filter((e) => e.subcategoryId === category.id));
+
+/** Варианты для выбора категории или подкатегории: [{ value: 'c:id' | 's:id:подкатегория', label: 'Питомец' | 'Питомец › Корм' }]. */
+export function categoryChoices(categories) {
+  return topsOf(categories).flatMap((c) => [{ value: `c:${c.id}`, label: c.name }, ...subsOf(categories, c.id).map((s) => ({ value: `s:${c.id}:${s.id}`, label: `${c.name} › ${s.name}` }))]);
+}
+
+/**
+ * Поиск категории по тексту, который ввёл пользователь: точное название, затем единственное совпадение по началу и по вхождению.
+ * Возвращает value из categoryChoices или null, если такой категории нет или совпадений несколько.
+ */
+export function findCategoryChoice(categories, text) {
+  const norm = (s) => String(s).toLowerCase().replace(/ё/g, 'е').replace(/\s*(›|>|\/|-)\s*/g, ' › ').replace(/\s+/g, ' ').trim();
+  const q = norm(text); if (!q) return null;
+  const all = categoryChoices(categories).map((c) => ({ ...c, n: norm(c.label), own: norm(c.label.split(' › ').at(-1)) }));
+  for (const test of [(c) => c.n === q, (c) => c.own === q, (c) => c.own.startsWith(q), (c) => c.n.includes(q)]) { const m = all.filter(test); if (m.length === 1) return m[0].value; if (m.length > 1) return null; }
+  return null;
+}
