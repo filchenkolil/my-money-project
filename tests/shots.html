@@ -79,7 +79,7 @@
     { const el = a.q('#fcat'); el.value = 'pet'; el.dispatchEvent(new a.w.Event('change', { bubbles: true })); await sleep(150); }
     await snap(a, 'history-filters'); a.f.remove();
     a = await open('#/history'); await waitFor(() => a.q('.rec'));
-    a.click(a.q('.rec')); await waitFor(() => a.q('#amt') && a.q('h1')?.textContent === 'Редактирование'); await sleep(200);
+    a.click(a.qa('.rec').find((r) => !r.querySelector('.badge.trip'))); await waitFor(() => a.q('#amt') && a.q('h1')?.textContent === 'Редактирование'); await sleep(200);
     await snap(a, 'edit');
     a.type('2 345,50'); a.click(a.q('[data-act="reg"]')); a.click(a.q('#save')); await waitFor(() => a.q('.sheet')); await sleep(200);
     await snap(a, 'edit-review'); a.f.remove();
