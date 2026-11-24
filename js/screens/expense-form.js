@@ -5,7 +5,7 @@ import { formatInput, formatRub, toInputString } from '../money.js';
 import { dayShort, monthKey, shiftMonthsISO, rangeLabel } from '../dates.js';
 import { dayTotal, frequentCategories } from '../stats.js';
 import { newForm, afterSave, checkForm, tileList, expenseWord, expenseToForm, diffExpense } from '../form.js';
-import { checkTripForm, conversionText, defaultTripId, diffTripExpense, expenseRub, suggestRub } from '../trips.js';
+import { checkTripForm, conversionText, defaultTripId, diffTripExpense, expenseRub, suggestRub, frequentTripCategories } from '../trips.js';
 import { StoreError } from '../store.js';
 import { icon, UI } from '../ui/icons.js';
 import { esc, dotHTML, header, scrollToEl, installNotice, sheetHTML } from '../ui/dom.js';
@@ -30,6 +30,8 @@ export function mountExpenseForm(root, ctx, { expense = null, kind = 'regular' }
   const tops = () => ctx.categories.filter((c) => c.parentId === null);
   // Порядок плиток считаем один раз за открытие экрана: во время ввода пачкой плитки не должны прыгать.
   const order = frequentCategories(ctx.expenses, tops().map((c) => c.id), state.today);
+  let tOrder = null; // порядок плиток категорий поездки: считаем при открытии и при смене поездки, чтобы плитки не прыгали во время ввода
+  const tripTiles = () => { tOrder ??= frequentTripCategories(ctx.tripExpenses, tf.tripId, ctx.tripCategories.map((c) => c.id)); return tOrder.map(tcat).filter(Boolean); };
   const cat = (id) => ctx.categories.find((c) => c.id === id);
   const name = (id) => cat(id)?.name ?? '';
   const trip = () => ctx.trips.find((t) => t.id === tf.tripId) ?? null;
@@ -89,7 +91,7 @@ export function mountExpenseForm(root, ctx, { expense = null, kind = 'regular' }
     h += f.error ? `<div class="err" role="alert" id="err">${esc(f.error)}</div>` : `<div class="hint" id="conv">${esc(conversionText(t, f.amount, tf.rub))}</div>`;
     h += stripHTML(state.today, f.date);
     h += `<div class="lbl">Поездка</div><select class="inp" id="tripsel" aria-label="Поездка">${ctx.trips.map((x) => `<option value="${esc(x.id)}"${x.id === tf.tripId ? ' selected' : ''}>${esc(x.name + ', ' + rangeLabel(x.start, x.end))}</option>`).join('')}</select>`;
-    h += '<div class="lbl">Категория поездки</div><div class="tiles">' + ctx.tripCategories.map(ttile).join('') + '</div>';
+    h += '<div class="lbl">Категория поездки</div><div class="tiles">' + tripTiles().map(ttile).join('') + '</div>';
     h += `<div class="chips" id="extras" style="margin-top:16px"><button type="button" class="chip" data-act="note" aria-pressed="${!!note}">${note ? 'Комментарий' : '+ Комментарий'}</button></div>`;
     if (note) h += `<input class="inp" id="note" maxlength="200" style="margin-top:8px" aria-label="Комментарий" placeholder="на что потратила" value="${esc(f.note)}">`;
     return h;
@@ -295,7 +297,7 @@ export function mountExpenseForm(root, ctx, { expense = null, kind = 'regular' }
   root.onchange = (ev) => {
     const t = ev.target;
     if (t.id === 'date' && t.value) { f.date = t.value; if (mode === 'trip' && !edit) tf.tripId = defaultTripId(ctx.trips, f.date, tf.tripId); render(); }
-    else if (t.id === 'tripsel') { tf.tripId = t.value; if (trip()?.currency === 'RUB') tf.rub = false; else if (!tf.curTouched && !origTrip) tf.rub = suggestRub(trip(), ctx.tripExpenses, tf.categoryId); render(); }
+    else if (t.id === 'tripsel') { tf.tripId = t.value; tOrder = null; if (trip()?.currency === 'RUB') tf.rub = false; else if (!tf.curTouched && !origTrip) tf.rub = suggestRub(trip(), ctx.tripExpenses, tf.categoryId); render(); }
   };
   root.onkeydown = (ev) => {
     if (ev.key !== 'Enter') return;

@@ -4,6 +4,7 @@ import { openDb, deleteDb } from '../js/db.js';
 import { MIGRATIONS, SCHEMA_VERSION } from '../js/migrations.js';
 import { createStore } from '../js/store.js';
 import * as T from '../js/trips.js';
+const { frequentTripCategories } = T;
 import { buildBackup, parseBackup, planRestore, planTripRestore, buildTripsCsv, tripsCsvFileName } from '../js/backup.js';
 import { monthTotal } from '../js/stats.js';
 import { formatRub } from '../js/money.js';
@@ -346,4 +347,28 @@ test('автовыбор валюты расхода поездки: по про
   eq(T.suggestRub(trip, [ex('9', 'tc.tkt', false, '2026-05-01')], 'tc.tkt'), false, 'история важнее правила про билеты');
   eq(T.suggestRub(rubTrip, [], 'tc.tkt'), false, 'у рублёвой поездки валюта одна');
   eq(T.suggestRub(null, list, 'tc.res'), false);
+});
+
+test('курс ЦБ: перевод ответа в десятитысячные доли и поиск на дату с выходными', async () => {
+  const { rateFromCbr, fetchRate } = await import('../js/rates.js');
+  const j = { Valute: { TRY: { Nominal: 10, Value: 16.2522 }, GEL: { Nominal: 1, Value: 31.6927 }, BAD: { Nominal: 1, Value: 0 } } };
+  eq(rateFromCbr(j, 'TRY'), 16252, '10 лир = 16,2522 ₽, одна лира 1,6252'); eq(rateFromCbr(j, 'gel'), 316927); eq(rateFromCbr(j, 'BAD'), null); eq(rateFromCbr(j, 'XXX'), null); eq(rateFromCbr(null, 'TRY'), null);
+  const urls = [];
+  const fetcher = async (u) => { urls.push(u); if (u.includes('/2026/05/10/')) return { ok: true, json: async () => ({ Valute: { GEL: { Nominal: 1, Value: 30.5 } } }) }; return { ok: false, json: async () => null }; };
+  const r = await fetchRate('GEL', '2026-05-12', '2026-11-24', fetcher);
+  eq(r, { rateE4: 305000, date: '2026-05-10', latest: false }); eq(urls.length, 3, 'два дня без курса, на третьем нашли');
+  eq(urls[0], 'https://www.cbr-xml-daily.ru/archive/2026/05/12/daily_json.js');
+  const before = urls.length; await fetchRate('GEL', '2026-05-12', '2026-11-24', fetcher); eq(urls.length, before, 'повторный запрос берётся из памяти');
+  const latest = await fetchRate('TRY', '2027-01-03', '2026-11-24', async (u) => ({ ok: true, json: async () => ({ Valute: { TRY: { Nominal: 10, Value: 16 } } }) }));
+  eq(latest, { rateE4: 16000, date: '2026-11-24', latest: true }, 'для будущей поездки самый свежий курс');
+  eq(await fetchRate('RUB', '2026-05-12', '2026-11-24', fetcher), null); eq(await fetchRate('TRY', '2026-05-12', '2026-11-24', async () => { throw new Error('нет сети'); }), null);
+});
+
+test('порядок категорий поездки: чаще в этой поездке, при равенстве свежее, затем частые везде, затем как в настройках', () => {
+  const ex = (tripId, categoryId, date) => ({ tripId, categoryId, date });
+  const ids = ['a', 'b', 'c', 'd', 'e'];
+  const list = [ex('t', 'c', '2026-05-01'), ex('t', 'c', '2026-05-02'), ex('t', 'b', '2026-05-03'), ex('t', 'a', '2026-05-01'), ex('o', 'e', '2026-01-01'), ex('o', 'e', '2026-01-02'), ex('o', 'd', '2026-01-02')];
+  eq(frequentTripCategories(list, 't', ids), ['c', 'b', 'a', 'e', 'd']);
+  eq(frequentTripCategories([], 't', ids), ids, 'без истории порядок настроек');
+  eq(frequentTripCategories(list, 'новая', ids), ['c', 'e', 'a', 'b', 'd'], 'в новой поездке частые из других поездок');
 });

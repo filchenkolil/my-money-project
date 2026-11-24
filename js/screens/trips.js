@@ -9,6 +9,7 @@ import { expenseWord } from '../form.js';
 import { icon } from '../ui/icons.js';
 import { esc, hueColor, header, sheetHTML } from '../ui/dom.js';
 import { hashFor } from '../router.js';
+import { fetchRate } from '../rates.js';
 
 const fail = (e) => (e instanceof StoreError ? e.message : 'Не удалось сохранить. Данные не изменились, попробуйте ещё раз.');
 const tcat = (ctx, id) => ctx.tripCategories.find((c) => c.id === id);
@@ -88,6 +89,7 @@ export function mountTrip(root, ctx, id) {
 /* ---------- создание и правка поездки ---------- */
 export function mountTripEdit(root, ctx, id) {
   let disposed = false, saving = false, review = null, error = '', errField = '';
+  let rateTouched = false, rateSeq = 0, rateInfo = ''; // курс подставляется автоматически (ЦБ РФ), пока его не ввели вручную
   const isNew = id === 'new', old = isNew ? null : ctx.trips.find((x) => x.id === id);
   const known = CURRENCIES.some((c) => c[0] === (old?.currency ?? 'RUB'));
   let f = isNew ? { name: '', start: '', end: '', cur: 'RUB', other: '', rate: '' } : { name: old.name, start: old.start, end: old.end, cur: known ? old.currency : 'OTHER', other: known ? '' : old.currency, rate: formatRateFull(old.rateE4) };
@@ -109,7 +111,7 @@ export function mountTripEdit(root, ctx, id) {
     h += `<div class="lbl">Валюта</div><select class="inp" id="tcur" aria-label="Валюта">${CURRENCIES.map(([c, n]) => `<option value="${c}"${f.cur === c ? ' selected' : ''}>${c} — ${n}</option>`).join('')}<option value="OTHER"${f.cur === 'OTHER' ? ' selected' : ''}>Другая (код ISO)…</option></select>`;
     if (f.cur === 'OTHER') h += `<input class="inp" id="tother" maxlength="3" style="margin-top:8px" placeholder="Три буквы, например CHF" aria-label="Код валюты" value="${esc(f.other)}">`;
     h += err('currency');
-    if (currency() !== 'RUB') h += `<div class="lbl">Курс к рублю</div><input class="inp amt num" id="trate" inputmode="decimal" autocomplete="off" aria-label="Курс к рублю" placeholder="например, 2,3500" value="${esc(f.rate)}"><div class="small muted" style="margin-top:6px">1 единица валюты = ? ₽. Вводится вручную.</div>${err('rate')}`;
+    if (currency() !== 'RUB') h += `<div class="lbl">Курс к рублю</div><input class="inp amt num" id="trate" inputmode="decimal" autocomplete="off" aria-label="Курс к рублю" placeholder="например, 2,3500" value="${esc(f.rate)}"><div class="small muted" id="rateinfo" style="margin-top:6px">${esc(rateInfo || "1 единица валюты = ? ₽. Курс подставляется по данным ЦБ РФ на дату начала, его можно изменить.")}</div><button type="button" class="btn" style="margin-top:8px" data-act="fetchrate">Взять курс ЦБ РФ</button>${err("rate")}`;
     h += `<div id="prevbox">${previewHTML()}</div>`;
     h += `<button type="button" class="btn primary big" style="margin-top:16px" data-act="save">${isNew ? 'Создать поездку' : 'Сохранить'}</button>`;
     if (!isNew) h += '<button type="button" class="btn danger big" style="margin-top:8px" data-act="delete">Удалить поездку</button>';
@@ -140,10 +142,27 @@ export function mountTripEdit(root, ctx, id) {
     review = { rows, patch: { name: r.trip.name, currency: r.trip.currency, rate: r.trip.currency === 'RUB' ? '1' : f.rate } }; render();
   }
 
+  const showInfo = (text) => { rateInfo = text; const el = root.querySelector('#rateinfo'); if (el) el.textContent = text; };
+  const dmy = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
+  /** Подставляет курс ЦБ РФ на дату начала поездки (или самый свежий, если поездка ещё впереди). Ручной ввод не перезаписывается, если force не задан. */
+  async function loadRate(force = false) {
+    const cur = currency(); if (cur === 'RUB' || !/^[A-Z]{3}$/.test(cur) || (rateTouched && !force)) return;
+    const seq = ++rateSeq, today = ctx.state.today, date = (isNew ? f.start : old.start) || today;
+    showInfo('Загружаю курс ЦБ РФ…');
+    const r = await fetchRate(cur, date, today);
+    if (disposed || seq !== rateSeq) return; // экран закрыт или запрошен другой курс
+    if (!r) { showInfo('Курс ЦБ РФ получить не удалось (нет сети или такой валюты нет в списке). Введите курс вручную.'); return; }
+    f.rate = formatRateFull(r.rateE4); rateTouched = false;
+    const input = root.querySelector('#trate'); if (input) input.value = f.rate;
+    const box = root.querySelector('#prevbox'); if (box) box.innerHTML = previewHTML();
+    showInfo(r.latest ? `Курс ЦБ РФ на сегодня, ${dmy(r.date)}. Его можно изменить.` : r.date === date ? `Курс ЦБ РФ на ${dmy(date)}, начало поездки. Его можно изменить.` : `Курс ЦБ РФ на ${dmy(r.date)} (на ${dmy(date)} курса нет, взят ближайший предыдущий). Его можно изменить.`);
+  }
+
   root.onclick = (ev) => {
     const b = ev.target.closest('[data-act]'); if (!b) return;
     if (b.dataset.act === 'sheetbg' && ev.target !== b) return;
     switch (b.dataset.act) {
+      case 'fetchrate': loadRate(true); break;
       case 'back': location.hash = isNew ? hashFor('trips') : hashFor('trip', id); break;
       case 'save': save(); break;
       case 'delete': location.hash = hashFor('tripdel', id); break;
@@ -154,6 +173,7 @@ export function mountTripEdit(root, ctx, id) {
   root.oninput = (ev) => {
     const t = ev.target;
     if (t.id === 'tname') f.name = t.value; else if (t.id === 'tother') f.other = t.value; else if (t.id === 'trate') {
+      rateTouched = true;
       f.rate = t.value; const box = root.querySelector('#prevbox'); if (box) box.innerHTML = previewHTML();
     }
   };
@@ -163,8 +183,10 @@ export function mountTripEdit(root, ctx, id) {
       f.start = t.value; // «По» сразу переходит на месяц и день начала: календарь откроется там, а не в сегодняшнем месяце
       if (f.start && (!f.end || f.end < f.start)) f.end = f.start;
       const end = root.querySelector('#tend'); if (end) { end.min = f.start; end.value = f.end; }
+      if (isNew) loadRate();
     } else if (t.id === 'tend') f.end = t.value;
-    else if (t.id === 'tcur') { f.cur = t.value; render(); }
+    else if (t.id === 'tcur') { f.cur = t.value; rateTouched = false; if (isNew) f.rate = ''; rateInfo = ''; render(); if (isNew) loadRate(); }
+    else if (t.id === 'tother' && isNew) loadRate();
   };
   render();
   return { dispose() { disposed = true; } };

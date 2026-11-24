@@ -68,7 +68,7 @@ test('форма расхода: без поездок предлагает со
   try {
     a.click(a.qa('.seg button')[1]); await sleep(60);
     eq(a.q('.seg [aria-pressed="true"]').textContent, 'Поездки');
-    eq(a.qa('.tiles .tile').map((t) => t.textContent.trim()), ['Экскурсии', 'Связь', 'Транспорт', 'Сувениры', 'Рестораны', 'Продукты', 'Проживание', 'Билеты', 'Прочее']);
+    eq(a.qa('.tiles .tile').map((t) => t.textContent.trim()), ['Рестораны', 'Проживание', 'Билеты', 'Экскурсии', 'Связь', 'Транспорт', 'Сувениры', 'Продукты', 'Прочее']); /* порядок по частоте: сначала использованные в этой поездке */
     eq(a.qa('.chips .chip').slice(0, 2).map((c) => c.textContent), ['TRY', '₽']);
     ok(a.q('#conv').textContent.includes('по курсу поездки (2,35)'), a.q('#conv').textContent);
     a.typeAmount('100'); ok(a.q('#conv').textContent.includes('≈') && a.q('#conv').textContent.includes('235') && a.q('#conv').textContent.includes('2,35 ₽ за 1 TRY'), a.q('#conv').textContent);
@@ -377,5 +377,38 @@ test('расход поездки: валюта выбирается сама (�
     a.click(a.q('[data-act="cur"][data-v="rub"]')); await sleep(60);
     a.click(a.q('[data-act="tcat"][data-id="tc.sty"]')); await sleep(60);
     eq(pressed(), 'rub', 'ручной выбор не сбрасывается сменой категории');
+  } finally { a.close(); }
+});
+
+test('новая поездка: курс подставляется автоматически на дату начала, ручной ввод не затирается, кнопка берёт курс заново', async () => {
+  const a = await openApp({ route: '#/tripedit/new' });
+  const asked = [];
+  try {
+    await waitFor(() => a.q('#tcur'), 'форма');
+    a.win.__mymoneyRates = (code, date) => { asked.push([code, date]); return { rateE4: 28123, date, latest: false }; };
+    a.change(a.q('#tcur'), 'GEL'); await waitFor(() => a.q('#trate').value === '2,8123', 'курс подставлен');
+    ok(a.q('#rateinfo').textContent.includes('Курс ЦБ РФ'), a.q('#rateinfo').textContent);
+    setDate(a, a.q('#tstart'), '2026-05-12'); await waitFor(() => asked.some((x) => x[1] === '2026-05-12'), 'запрос на дату начала');
+    eq(asked.at(-1), ['GEL', '2026-05-12']); ok(a.q('#rateinfo').textContent.includes('12.05.2026'), a.q('#rateinfo').textContent);
+    a.input(a.q('#trate'), '2,9000'); const n = asked.length;
+    setDate(a, a.q('#tstart'), '2026-05-14'); await sleep(120);
+    eq(asked.length, n, 'после ручного ввода курс сам не меняется'); eq(a.q('#trate').value, '2,9000');
+    a.click(a.q('[data-act="fetchrate"]')); await waitFor(() => a.q('#trate').value === '2,8123', 'кнопка берёт курс ЦБ заново');
+    a.win.__mymoneyRates = () => null; a.click(a.q('[data-act="fetchrate"]')); await waitFor(() => a.q('#rateinfo').textContent.includes('не удалось'), 'сообщение об ошибке');
+    eq(a.q('#trate').value, '2,8123', 'при неудаче прежнее значение остаётся');
+    a.input(a.q('#tname'), 'Грузия'); setDate(a, a.q('#tend'), '2026-05-20'); a.input(a.q('#trate'), '2,8123'); a.click(a.q('[data-act="save"]'));
+    await waitFor(() => a.h1() === 'Грузия', 'сохранена');
+    eq((await firstTrip()).rateE4, 28123);
+  } finally { a.close(); }
+});
+
+test('форма расхода поездки: категории по частоте использования в выбранной поездке', async () => {
+  const a = await openApp({ seed: seedTrip, route: '#/add' });
+  try {
+    await waitFor(() => a.q('.seg'), 'форма');
+    a.click(a.qa('.seg button')[1]); await waitFor(() => a.q('#tripsel'), 'режим поездки');
+    const ids = a.qa('[data-act="tcat"]').map((b) => b.dataset.id);
+    eq(ids.slice(0, 3), ['tc.res', 'tc.sty', 'tc.tkt'], 'сначала недавние из этой поездки, остальные как в настройках');
+    eq(ids.length, 9); eq(ids[3], 'tc.exc');
   } finally { a.close(); }
 });

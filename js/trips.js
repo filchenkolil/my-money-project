@@ -196,3 +196,14 @@ export function suggestRub(trip, tripExpenses, categoryId) {
   if (same.length) return !!same[0].isRub;
   return categoryId === 'tc.tkt';
 }
+
+/**
+ * Порядок категорий поездки на форме расхода, как «частые сверху» в обычных расходах: чаще используемые в выбранной поездке,
+ * при равенстве те, что использованы позже, затем частые во всех поездках, затем порядок из «Настроек».
+ */
+export function frequentTripCategories(tripExpenses, tripId, categoryIds) {
+  const stat = (list) => { const m = {}; for (const e of list) { const s = (m[e.categoryId] ??= { n: 0, last: '' }); s.n++; if (e.date > s.last) s.last = e.date; } return m; };
+  const mine = stat(tripExpenses.filter((e) => e.tripId === tripId)), all = stat(tripExpenses);
+  return categoryIds.map((id, i) => ({ id, i })).sort((a, b) =>
+    (mine[b.id]?.n ?? 0) - (mine[a.id]?.n ?? 0) || (mine[b.id]?.last ?? '').localeCompare(mine[a.id]?.last ?? '') || (all[b.id]?.n ?? 0) - (all[a.id]?.n ?? 0) || a.i - b.i).map((x) => x.id);
+}

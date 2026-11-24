@@ -24,6 +24,7 @@ export async function openApp({ seed, height = 844, route = '' } = {}) {
   const win = frame.contentWindow;
   await new Promise((r) => frame.addEventListener('load', r, { once: true }));
   const doc = frame.contentDocument;
+  win.__mymoneyRates = () => null; // тесты не ходят в сеть за курсом: по умолчанию курс не получен, его вводят вручную
   await waitFor(() => doc.querySelector('.tabs button'), 'нижняя панель');
   const q = (s) => doc.querySelector(s), qa = (s) => [...doc.querySelectorAll(s)];
   const click = (el) => el.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
